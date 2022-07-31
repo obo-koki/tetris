@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
+from gettext import translation
+from time import time
 import pprint
 import copy
 import math
 from enum import Enum
-
-from numpy import full
+import numpy as np
 
 class Mode(Enum):
     NORMAL = 1
@@ -33,7 +34,7 @@ class Block_Controller(object):
     #    nextMove : nextMove structure which includes next shape position and the other.
     def GetNextMove(self, nextMove, GameStatus):
 
-        t1 = datetime.now()
+        t1 = time()
 
         # print GameStatus
         print("=================================================>")
@@ -52,8 +53,11 @@ class Block_Controller(object):
         self.board_data_width = GameStatus["field_info"]["width"]
         self.board_data_height = GameStatus["field_info"]["height"]
         self.ShapeNone_index = GameStatus["debug_info"]["shape_info"]["shapeNone"]["index"]
+        # change board list in numpy list
+        self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_data_height, self.board_data_width)
 
         # search best nextMove -->
+        mode = self.decideMode(self.board_backboard_np)
         strategy = None
         LatestEvalValue = -100000
         # search with current block Shape
@@ -62,10 +66,10 @@ class Block_Controller(object):
             x0Min, x0Max = self.getSearchXRange(self.CurrentShape_class, direction0)
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
-                board, dy= self.getDropDownBoard(self.board_backboard, self.CurrentShape_class, direction0, x0)
+                board, dy= self.getDropDownBoard(self.board_backboard_np, self.CurrentShape_class, direction0, x0)
 
                 # evaluate board
-                EvalValue = self.calcEvaluationValueSample(board, dy)
+                EvalValue = self.calcEvaluationValue(board, dy, mode)
                 # update best move
                 if EvalValue > LatestEvalValue:
                     strategy = (direction0, x0, 1, 1)
@@ -82,7 +86,8 @@ class Block_Controller(object):
                 ###            LatestEvalValue = EvalValue
         # search best nextMove <--
 
-        print("===", datetime.now() - t1)
+        print("Mode = ", mode)
+        print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
@@ -118,16 +123,16 @@ class Block_Controller(object):
         return _board, dy
     
     def removeFullLines(self, board):
-        height = self.board_data_height
-        width = self.board_data_width
-        newBoard = [0] * width * height
+        height = board.shape[0]
+        width = board.shape[1]
+        newBoard = np.zeros((height, width))
         newY = height - 1
         fullLines = 0
         for y in range(height - 1, -1, -1):
-            blockCount = sum([1 if board[x + y * width] > 0 else 0 for x in range(width)])
+            blockCount = sum([1 if board[y, x] > 0 else 0 for x in range(width)])
             if blockCount < width and blockCount > 0:
                 for x in range(width):
-                    newBoard[x + newY * width] = board[x + y * width]
+                    newBoard[newY, x] = board[y, x]
                 newY -= 1
             elif blockCount == width:
                 fullLines += 1
@@ -138,12 +143,13 @@ class Block_Controller(object):
         # internal function of getBoard.
         # -- drop down the shape on the board.
         # 
-        dy = self.board_data_height - 1
+        height = board.shape[0]
+        dy = height - 1
         coordArray = self.getShapeCoordArray(Shape_class, direction, x, 0)
         # update dy
         for _x, _y in coordArray:
             _yy = 0
-            while _yy + _y < self.board_data_height and (_yy + _y < 0 or board[(_y + _yy) * self.board_data_width + _x] == self.ShapeNone_index):
+            while _yy + _y < height and (_yy + _y < 0 or board[_y + _yy, _x] == self.ShapeNone_index):
                 _yy += 1
             _yy -= 1
             if _yy < dy:
@@ -159,116 +165,150 @@ class Block_Controller(object):
         _board = board
         coordArray = self.getShapeCoordArray(Shape_class, direction, x, 0)
         for _x, _y in coordArray:
-            _board[(_y + dy) * self.board_data_width + _x] = Shape_class.shape
+            _board[_y + dy, _x] = Shape_class.shape
         return _board
+    
+    def decideMode(self, board):
+        mode = Mode.NORMAL
+        peaks = self.get_peaks(board)
+        maxY = np.max(peaks)
+        holes = self.get_holes(board, peaks)
+        n_holes = np.sum(holes)
+        if n_holes > 10:
+            mode = Mode.DEFENCE
+        elif maxY < 10:
+            mode = Mode.ATTACK
+        print(board)
+        print("Mode", mode)
+        return mode
 
-    def calcEvaluationValueSample(self, board, dy):
-        #
-        # sample function of evaluate board.
-        #
-        width = self.board_data_width
-        height = self.board_data_height
-
-        # evaluation paramters
-        ## lines to be removed
-        board, fullLines= self.removeFullLines(board)
-        ## number of holes or blocks in the line.
-        nHoles, nIsolatedBlocks = 0, 0
-        ## absolute differencial value of MaxY
-        absDy = 0
-        ## how blocks are accumlated
-        BlockMaxY = [0] * width
-        holeCandidates = [0] * width
-        holeConfirm = [0] * width
-
-        ### check board
-        # each y line
-        for y in range(height - 1, 0, -1): 
-            hasHole = False 
-            hasBlock = False
-            # each x line
-            for x in range(width):
-                ## check if hole or block..
-                if board[y * self.board_data_width + x] == self.ShapeNone_index:
-                    # hole
-                    hasHole = True
-                    holeCandidates[x] += 1  # just candidates in each column..
-                else:
-                    # block
-                    hasBlock = True
-                    BlockMaxY[x] = height - y                # update blockMaxY
-                    if holeCandidates[x] > 0:
-                        holeConfirm[x] += holeCandidates[x]  # update number of holes in target column..
-                        holeCandidates[x] = 0                # reset
-                    if holeConfirm[x] > 0:
-                        nIsolatedBlocks += 1                 # update number of isolated blocks
-
-            if hasBlock == True and hasHole == False:
-                # filled with block
-                pass
-            elif hasBlock == True and hasHole == True:
-                # do nothing
-                pass
-            elif hasBlock == False:
-                # no block line (and ofcourse no hole)
-                pass
-
-        # nHoles
-        for x in holeConfirm:
-            nHoles += abs(x)
-
-        ### absolute differencial value of MaxY
-        BlockMaxDy = []
-        for i in range(len(BlockMaxY) - 1):
-            val = BlockMaxY[i] - BlockMaxY[i+1]
-            BlockMaxDy += [val]
-        for x in BlockMaxDy:
-            absDy += abs(x)
-
-        #### maxDy
-        #maxDy = max(BlockMaxY) - min(BlockMaxY)
-        # maxHeight
-        maxHeight = max(BlockMaxY) #- fullLines
-        maxHeight_right_edge = BlockMaxY[self.board_data_width - 1]
-
-        ## statistical data
-        ## stdY
-        if len(BlockMaxY) <= 0:
-            stdY = 0
-        else:
-            stdY = math.sqrt(sum([y ** 2 for y in BlockMaxY]) / len(BlockMaxY) - (sum(BlockMaxY) / len(BlockMaxY)) ** 2)
-        #### stdDY
-        #if len(BlockMaxDy) <= 0:
-        #    stdDY = 0
-        #else:
-        #    stdDY = math.sqrt(sum([y ** 2 for y in BlockMaxDy]) / len(BlockMaxDy) - (sum(BlockMaxDy) / len(BlockMaxDy)) ** 2)
-        
-        mode = Mode.ATTACK
-        #if maxHeight < 10:
-            #mode = Mode.ATTACK
-        #elif stdY > 3:
-            #mode = Mode.DEFENCE
-
+    def calcEvaluationValue(self, board, dy, mode = Mode.ATTACK):
         # calc Evaluation Value
+        board, fullLines = self.removeFullLines(board)
+        peaks = self.get_peaks(board)
+        maxY = np.max(peaks)
+        maxY_right = peaks[-1]
+        holes = self.get_holes(board, peaks)
+        total_holes = np.sum(holes)
+        total_col_with_hole = self.get_total_cols_with_hole(board, holes)
+        x_transitions = self.get_x_transitions(board, maxY)
+        y_transitions = self.get_y_transitions(board, peaks)
+        total_dy = self.get_total_dy(board, peaks)
+        wells = self.get_wells(board, peaks)
+        total_none_cols = self.get_total_none_cols(board)
+
         score = 0
         if mode == Mode.NORMAL:
-            #score = score + fullLines * 10.0           # try to delete line 
             score = score + dy * 1
-            score = score - nHoles * 100               # try not to make hole
-            score = score - maxHeight * 50              # maxHeight
+            score = score - total_holes * 100
+            score = score - maxY * 50
         elif mode == Mode.ATTACK:
             if fullLines < 3:
-                score = score - 1000 * maxHeight_right_edge
-            score = score - nHoles * 100               # try not to make hole
-            score = score - maxHeight * 5             # maxHeight
+                score = score - 1000 * maxY_right
+            score = score - total_holes * 100
+            score = score - maxY * 5
             score = score + dy * 1
         elif mode == Mode.DEFENCE:
-            score = score - nHoles * 10              # try not to make hole
-            score = score - maxHeight * 50             # maxHeight
+            score = score - total_holes * 10
+            score = score - maxY * 50
             score = score + dy * 1
 
-        # print(score, fullLines, nHoles, nIsolatedBlocks, maxHeight, stdY, stdDY, absDy, BlockMaxY)
         return score
+    
+    def get_peaks(self, board):
+        height = board.shape[0]
+        width = board.shape[1]
+        peaks_list = []
+        for x in range(width):
+            block_ind = board[:, x].nonzero()
+            if  len(block_ind[0]) == 0:
+                peaks_list.append(0)
+            else:
+                peaks_list.append(height -  block_ind[0][0])
+        peaks = np.asarray(peaks_list)
+        return peaks
 
+    def get_holes(self, board, peaks = None):
+        height = board.shape[0]
+        width = board.shape[1]
+        if peaks is None:
+            peaks = self.get_peaks(board)
+        holes_list = []
+        for col in range(width):
+            start_raw = height - peaks[col]
+            if start_raw == 0:
+                holes_list.append(0)
+            else:
+                holes_list.append(np.count_nonzero(board[start_raw:, col] == 0))
+        holes = np.asarray(holes_list)
+        return holes
+    
+    def get_fullLines(self, board):
+        height = board.shape[0]
+        width = board.shape[1]
+        fullLines = 0
+        for raw in range(height):
+            blocks = np.count_nonzero(board[raw] != self.ShapeNone_index)
+            if blocks == width:
+                fullLines += 1
+        return fullLines
+    
+    def get_total_cols_with_hole(self, board, holes = None):
+        if holes is None:
+            holes = self.get_holes(board)
+        return np.count_nonzero(holes > 0)
+    
+    def get_x_transitions(self, board, maxY = None):
+        if maxY is None:
+            maxY = self.get_maxY(board)
+        height = board.shape[0]
+        width = board.shape[1]
+        transitions = 0
+        for y in range(height - maxY, height):
+            for x in range(1, width):
+                if board[y, x] != board[y, x-1]:
+                    transitions += 1
+        return transitions
+    
+    def get_y_transitions(self, board, peaks = None):
+        if peaks is None:
+            peaks = self.get_peaks(board)
+        height = board.shape[0]
+        width = board.shape[1]
+        transitions = 0
+        for x in range(width):
+            for y in range(height - peaks[x], height -1):
+                if board[y, x] != board[y+1, x]:
+                    transitions += 1
+        return transitions
+    
+    def get_total_dy(self, board, peaks = None):
+        if peaks is None:
+            peaks = self.get_peaks(board)
+        total_dy = 0
+        for x in range(len(peaks)-1):
+            total_dy += np.abs(peaks[x+1] - peaks[x])
+        return total_dy
+    
+    def get_wells(self, board, peaks = None):
+        if peaks is None:
+            peaks = self.get_peaks(board)
+        wells = []
+        for x in range(len(peaks) - 1):
+            if x == 0:
+                well = peaks[1] - peaks[0]
+                well = well if well > 0 else 0
+                wells.append(well)
+            else:
+                w1 = peaks[x - 1] - peaks[x]
+                w2 = peaks[x + 1] - peaks[x]
+                w1 = w1 if w1 > 0 else 0
+                w2 = w2 if w2 > 0 else 0
+                well = w1 if w1 >= w2 else w2
+                wells.append(well)
+        return wells
+    
+    def get_total_none_cols(self, board):
+        return np.count_nonzero(np.count_nonzero(board, axis=0) == 0)
 
-BLOCK_CONTROLLER_SAMPLE = Block_Controller()
+BLOCK_CONTROLLER = Block_Controller()
