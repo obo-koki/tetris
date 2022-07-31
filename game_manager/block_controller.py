@@ -174,9 +174,11 @@ class Block_Controller(object):
         maxY = np.max(peaks)
         holes = self.get_holes(board, peaks)
         n_holes = np.sum(holes)
-        if n_holes > 10:
+        wells = self.get_wells(board, peaks)
+        second_well = np.sort(wells)[-2]
+        if second_well > 4:
             mode = Mode.DEFENCE
-        elif maxY < 10:
+        elif maxY < 12:
             mode = Mode.ATTACK
         print(board)
         print("Mode", mode)
@@ -186,10 +188,11 @@ class Block_Controller(object):
         # calc Evaluation Value
         board, fullLines = self.removeFullLines(board)
         peaks = self.get_peaks(board)
+        nPeaks = peaks.sum()
         maxY = np.max(peaks)
         maxY_right = peaks[-1]
         holes = self.get_holes(board, peaks)
-        total_holes = np.sum(holes)
+        nHoles = np.sum(holes)
         total_col_with_hole = self.get_total_cols_with_hole(board, holes)
         x_transitions = self.get_x_transitions(board, maxY)
         y_transitions = self.get_y_transitions(board, peaks)
@@ -199,20 +202,22 @@ class Block_Controller(object):
 
         score = 0
         if mode == Mode.NORMAL:
-            score = score + dy * 1
-            score = score - total_holes * 100
-            score = score - maxY * 50
+            score -= nHoles * 10
+            score -= maxY * 50
+            score -= nPeaks * 1
+            score += dy * 1
+        elif mode == Mode.DEFENCE:
+            score -= nHoles * 10
+            score -= maxY * 50
+            score -= nPeaks * 1
+            score += dy * 1
         elif mode == Mode.ATTACK:
             if fullLines < 3:
-                score = score - 1000 * maxY_right
-            score = score - total_holes * 100
-            score = score - maxY * 5
-            score = score + dy * 1
-        elif mode == Mode.DEFENCE:
-            score = score - total_holes * 10
-            score = score - maxY * 50
-            score = score + dy * 1
-
+                score -= 1000 * maxY_right
+            score -= nHoles * 100
+            score -= maxY * 5
+            score -= nPeaks * 1
+            score += dy * 1
         return score
     
     def get_peaks(self, board):
@@ -294,9 +299,13 @@ class Block_Controller(object):
         if peaks is None:
             peaks = self.get_peaks(board)
         wells = []
-        for x in range(len(peaks) - 1):
+        for x in range(len(peaks)):
             if x == 0:
                 well = peaks[1] - peaks[0]
+                well = well if well > 0 else 0
+                wells.append(well)
+            elif x == len(peaks) - 1:
+                well = peaks[-2] - peaks[-1]
                 well = well if well > 0 else 0
                 wells.append(well)
             else:
