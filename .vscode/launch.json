@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: 現在のファイル",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args":["-m", "sample"],
+            "subProcess": true
+        },
+        {
+            "name": "Python: game_manager_sample",
+            "type": "python",
+            "request": "launch",
+            "program": "/home/koki/tetris/tetris/game_manager/game_manager.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args":["--game_time", "180", "--seed", "0", "--obstacle_height", "0","--obstacle_probability", "0", 
+                    "--drop_interval","1000", "--mode", "default", "--user_name", "window_sample", "--resultlogjson","result.json",
+                    "--train_yaml", "config/default.yaml", "--predict_weight", "outputs/latest/best_weight.pt", "--ShapeListMax", "6",
+                    "--BlockNumMax", "-1"
+                ],
+            "subProcess": true
+        }
+    ]
+   }
