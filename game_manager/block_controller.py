@@ -9,6 +9,8 @@ import copy
 import math
 from enum import Enum
 import numpy as np
+import csv
+import os
 
 class Mode(Enum):
     NORMAL = 1
@@ -38,7 +40,7 @@ class Block_Controller(object):
 
         # print GameStatus
         print("=================================================>")
-        pprint.pprint(GameStatus, width = 61, compact = True)
+        #pprint.pprint(GameStatus, width = 61, compact = True)
 
         # get data from GameStatus
         # current shape info
@@ -58,6 +60,7 @@ class Block_Controller(object):
 
         # search best nextMove -->
         mode = self.decideMode(self.board_backboard_np)
+        self.individual = self.get_individual(csv_file = os.path.dirname(os.path.abspath(__file__)) + "/individual.csv")
         strategy = None
         LatestEvalValue = -100000
         # search with current block Shape
@@ -92,9 +95,18 @@ class Block_Controller(object):
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
         nextMove["strategy"]["y_moveblocknum"] = strategy[3]
-        print(nextMove)
-        print("###### SAMPLE CODE ######")
+        #print(nextMove)
         return nextMove
+
+    def get_individual(self, csv_file = "individual.csv"):
+        print("csv_file", csv_file)
+        with open(csv_file, 'r') as csv_file:
+            reader = csv.reader(csv_file)
+            ind_list = []
+            for row in reader:
+                for col in row:
+                    ind_list.append(float(col))
+            return np.array(ind_list)
 
     def getSearchXRange(self, Shape_class, direction):
         #
@@ -180,8 +192,6 @@ class Block_Controller(object):
             mode = Mode.DEFENCE
         elif maxY < 12:
             mode = Mode.ATTACK
-        print(board)
-        print("Mode", mode)
         return mode
 
     def calcEvaluationValue(self, board, dy, mode = Mode.ATTACK):
@@ -198,26 +208,34 @@ class Block_Controller(object):
         y_transitions = self.get_y_transitions(board, peaks)
         total_dy = self.get_total_dy(board, peaks)
         wells = self.get_wells(board, peaks)
+        maxWell = np.max(wells)
         total_none_cols = self.get_total_none_cols(board)
 
-        score = 0
-        if mode == Mode.NORMAL:
-            score -= nHoles * 10
-            score -= maxY * 50
-            score -= nPeaks * 1
-            score += dy * 1
-        elif mode == Mode.DEFENCE:
-            score -= nHoles * 10
-            score -= maxY * 50
-            score -= nPeaks * 1
-            score += dy * 1
-        elif mode == Mode.ATTACK:
-            if fullLines < 3:
-                score -= 1000 * maxY_right
-            score -= nHoles * 100
-            score -= maxY * 5
-            score -= nPeaks * 1
-            score += dy * 1
+        eval_list = np.array([fullLines, nPeaks, maxY, maxY_right, nHoles, total_col_with_hole,
+            x_transitions, y_transitions, total_dy, maxWell])
+        
+        #print("individual", self.individual)
+        #print("eval_list", eval_list)
+        score = np.dot(self.individual, np.transpose(eval_list))
+        #print ("score", score)
+
+        #if mode == Mode.NORMAL:
+            #score -= nHoles * 10
+            #score -= maxY * 50
+            #score -= nPeaks * 1
+            #score += dy * 1
+        #elif mode == Mode.DEFENCE:
+            #score -= nHoles * 10
+            #score -= maxY * 50
+            #score -= nPeaks * 1
+            #score += dy * 1
+        #elif mode == Mode.ATTACK:
+            #if fullLines < 3:
+                #score -= 1000 * maxY_right
+            #score -= nHoles * 100
+            #score -= maxY * 5
+            #score -= nPeaks * 1
+            #score += dy * 1
         return score
     
     def get_peaks(self, board):

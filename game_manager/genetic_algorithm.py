@@ -64,8 +64,6 @@ def start():
     best_ind = tools.selBest(pop, 1)[0]
     print("The best individual is %s and then, the fitness value is %s" % (best_ind, best_ind.fitness.values))
     make_csv(best_ind)
-    execute_tetris_game()
-    print(get_result())
 
 if __name__ == '__main__':
     start()
