@@ -1,9 +1,15 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import sys
+import sys, os
 import subprocess
 from argparse import ArgumentParser
+
+def disable_print():
+    sys.stdout = open(os.devnull, 'w')
+
+def enable_print():
+    sys.stdout = sys.__stdout__
 
 def get_option(game_level, game_time, mode, random_seed, drop_interval, resultlogjson, train_yaml, predict_weight, user_name, ShapeListMax, BlockNumMax):
     argparser = ArgumentParser()
@@ -51,6 +57,7 @@ def get_python_cmd():
     return "python"
 
 def start():
+    disable_print()
     ## default value
     GAME_LEVEL = 1
     GAME_TIME = 180
@@ -140,7 +147,7 @@ def start():
 
     ## start game
     PYTHON_CMD = get_python_cmd()
-    cmd = PYTHON_CMD + ' ' + 'game_manager.py' \
+    cmd = PYTHON_CMD + ' ' + 'game_manager_gen.py' \
         + ' ' + '--game_time' + ' ' + str(GAME_TIME) \
         + ' ' + '--seed' + ' ' + str(RANDOM_SEED) \
         + ' ' + '--obstacle_height' + ' ' + str(OBSTACLE_HEIGHT) \

@@ -1,11 +1,15 @@
+from audioop import minmax
+from faulthandler import disable
 import random
 import subprocess
-import sys
-import csv
-import json
-from unicodedata import name
+import os, sys
+import csv, json
+import time
+import numpy as np
 from deap import base, creator, tools, algorithms
 from ga_config import NIND, NGEN, POP, CXPB, MUTPB, GAME_LEVEL, GAME_TIME, DROP_INTERVAL
+
+GAME_CNT = 0
 
 def make_csv(individual, file_name = 'individual.csv'):
     with open(file_name, 'w') as csv_file:
@@ -13,29 +17,44 @@ def make_csv(individual, file_name = 'individual.csv'):
         writer.writerow(individual)
 
 def execute_tetris_game():
-    cmd = 'python3' + ' ' + 'start.py' \
+    #random_seed = int(time.time() * 100000000)
+    random_seed = 1
+    cmd = 'python3' + ' ' + 'start_gen.py' \
         + ' ' + '--game_level' + ' ' + str(GAME_LEVEL) \
         + ' ' + '--game_time' + ' ' + str(GAME_TIME) \
-        + ' ' + '--drop_interval' + ' ' + str(DROP_INTERVAL)
+        + ' ' + '--drop_interval' + ' ' + str(DROP_INTERVAL)\
+        + ' ' + '--random_seed' + ' ' + str(random_seed)
 
+    disable_print()
     ret = subprocess.run(cmd, shell=True)
     if ret.returncode != 0:
         print('error: subprocess failed.', file=sys.stderr)
         sys.exit(1)
+    enable_print()
 
 def get_result():
     result_json_file = open('result.json', 'r')
     result = json.load(result_json_file)
     return result['judge_info']['score']
     
+def eval_ind(individual):
+    global GAME_CNT
+    make_csv(individual)
+    execute_tetris_game()
+    GAME_CNT += 1
+    #print("###### Genetic Alogithm #####")
+    #print("GEN: ", GAME_CNT // NIND, " / ", NGEN, ", IND: ", GAME_CNT % NIND, " / ", NIND)
+    return get_result(),
+
+def disable_print():
+    sys.stdout = open(os.devnull, 'w')
+
+def enable_print():
+    sys.stdout = sys.__stdout__
+
 def start():
     creator.create("FitnessMax", base.Fitness, weights=(1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMax)
-
-    def obfunc(individual):
-        make_csv(individual)
-        execute_tetris_game()
-        return get_result(),
 
     toolbox = base.Toolbox()
     toolbox.register("attribute", random.uniform, -10,10)
@@ -50,18 +69,31 @@ def start():
     for i in range(NIND):
         sigma_list.append(20.0)
     toolbox.register("mutate", tools.mutGaussian, mu=mu_list, sigma=sigma_list, indpb=0.2)
-    toolbox.register("evaluate", obfunc)
+    toolbox.register("evaluate", eval_ind)
 
-    random.seed(64)
+    random.seed(int(time.time() * 100000000))
 
     pop = toolbox.population(n=POP)
     for individual in pop:
         individual.fitness.values = toolbox.evaluate(individual)
     hof = tools.ParetoFront()
 
-    algorithms.eaSimple(pop, toolbox, cxpb=CXPB, mutpb=MUTPB, ngen=NGEN, halloffame=hof)
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", np.mean)
+    stats.register("std", np.std)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
 
+    algorithms.eaSimple(pop, toolbox, cxpb=CXPB, mutpb=MUTPB, ngen=NGEN, stats = stats, halloffame=hof)
+
+    #get best individual from last generations
     best_ind = tools.selBest(pop, 1)[0]
+    best_value = best_ind.fitness.values
+    #search best individual from all generations
+    for ind in hof:
+        if ind.fitness.values > best_value:
+            best_ind = ind
+
     print("The best individual is %s and then, the fitness value is %s" % (best_ind, best_ind.fitness.values))
     make_csv(best_ind)
 

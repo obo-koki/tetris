@@ -39,7 +39,7 @@ class Block_Controller(object):
         t1 = time()
 
         # print GameStatus
-        print("=================================================>")
+        #print("=================================================>")
         #pprint.pprint(GameStatus, width = 61, compact = True)
 
         # get data from GameStatus
@@ -60,7 +60,7 @@ class Block_Controller(object):
 
         # search best nextMove -->
         mode = self.decideMode(self.board_backboard_np)
-        self.individual = self.get_individual(csv_file = os.path.dirname(os.path.abspath(__file__)) + "/individual.csv")
+        self.individual = self.get_individual(csv_file = os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
         strategy = None
         LatestEvalValue = -100000
         # search with current block Shape
@@ -89,8 +89,8 @@ class Block_Controller(object):
                 ###            LatestEvalValue = EvalValue
         # search best nextMove <--
 
-        print("Mode = ", mode)
-        print("Search time = ", time() - t1)
+        #print("Mode = ", mode)
+        #print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
@@ -99,7 +99,6 @@ class Block_Controller(object):
         return nextMove
 
     def get_individual(self, csv_file = "individual.csv"):
-        print("csv_file", csv_file)
         with open(csv_file, 'r') as csv_file:
             reader = csv.reader(csv_file)
             ind_list = []
@@ -211,8 +210,21 @@ class Block_Controller(object):
         maxWell = np.max(wells)
         total_none_cols = self.get_total_none_cols(board)
 
-        eval_list = np.array([fullLines, nPeaks, maxY, maxY_right, nHoles, total_col_with_hole,
-            x_transitions, y_transitions, total_dy, maxWell])
+        #20220806
+        #eval_list = np.array([fullLines, nPeaks, maxY, maxY_right, nHoles, total_col_with_hole,
+            #x_transitions, y_transitions, total_dy, maxWell])
+
+        #20220810-1
+        #eval_list = np.array([fullLines**2, nPeaks, maxY, nHoles,
+            #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
+
+        #20220810-2
+        if fullLines < 3:
+            fullLines = 0
+        #eval_list = np.array([fullLines, nPeaks, maxY, nHoles,
+            #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
+        eval_list = np.array([nPeaks, maxY, nHoles,
+            x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
         
         #print("individual", self.individual)
         #print("eval_list", eval_list)
