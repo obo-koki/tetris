@@ -1,5 +1,3 @@
-from audioop import minmax
-from faulthandler import disable
 import random
 import subprocess
 import os, sys
@@ -10,17 +8,18 @@ from deap import base, creator, tools, algorithms
 from ga_config import NIND, NGEN, POP, CXPB, MUTPB, GAME_LEVEL, GAME_TIME, DROP_INTERVAL
 
 GAME_CNT = 0
+GEN = 0
+SEED = 0
+game_level = 1
 
 def make_csv(individual, file_name = 'individual.csv'):
     with open(file_name, 'w') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(individual)
 
-def execute_tetris_game():
-    #random_seed = int(time.time() * 100000000)
-    random_seed = 1
+def execute_tetris_game(random_seed, game_level=1):
     cmd = 'python3' + ' ' + 'start_gen.py' \
-        + ' ' + '--game_level' + ' ' + str(GAME_LEVEL) \
+        + ' ' + '--game_level' + ' ' + str(game_level) \
         + ' ' + '--game_time' + ' ' + str(GAME_TIME) \
         + ' ' + '--drop_interval' + ' ' + str(DROP_INTERVAL)\
         + ' ' + '--random_seed' + ' ' + str(random_seed)
@@ -38,9 +37,14 @@ def get_result():
     return result['judge_info']['score']
     
 def eval_ind(individual):
-    global GAME_CNT
+    global GAME_CNT, GEN, SEED, game_level
     make_csv(individual)
-    execute_tetris_game()
+    if not GEN == GAME_CNT // POP:
+        SEED  = int(time.time() * 100000000)
+        GEN = GAME_CNT // POP
+        #game_level = random.randint(1,3)
+    #print("SEED:", SEED)
+    execute_tetris_game(SEED, game_level)
     GAME_CNT += 1
     #print("###### Genetic Alogithm #####")
     #print("GEN: ", GAME_CNT // NIND, " / ", NGEN, ", IND: ", GAME_CNT % NIND, " / ", NIND)
@@ -57,17 +61,17 @@ def start():
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
-    toolbox.register("attribute", random.uniform, -10,10)
+    toolbox.register("attribute", random.uniform, -1,1)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, NIND)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("select", tools.selTournament, tournsize=5)
+    toolbox.register("select", tools.selTournament, tournsize=3)
     toolbox.register("mate", tools.cxBlend,alpha=0.2)
     mu_list = []
     for i in range(NIND):
         mu_list.append(0.0)
     sigma_list = []
     for i in range(NIND):
-        sigma_list.append(20.0)
+        sigma_list.append(0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=mu_list, sigma=sigma_list, indpb=0.2)
     toolbox.register("evaluate", eval_ind)
 

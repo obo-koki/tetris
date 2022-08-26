@@ -187,19 +187,23 @@ class Block_Controller(object):
         n_holes = np.sum(holes)
         wells = self.get_wells(board, peaks)
         second_well = np.sort(wells)[-2]
-        if second_well > 4:
-            mode = Mode.DEFENCE
-        elif maxY < 12:
+        if second_well < 5 and maxY < 12 and n_holes < 4:
             mode = Mode.ATTACK
+        #print("mode:", mode)
         return mode
 
     def calcEvaluationValue(self, board, dy, mode = Mode.ATTACK):
         # calc Evaluation Value
+
+        #before remove full lines
+        peaks_before = self.get_peaks(board)
+        maxY_right = peaks_before[-1]
+
+        #after remove full lines
         board, fullLines = self.removeFullLines(board)
         peaks = self.get_peaks(board)
         nPeaks = peaks.sum()
         maxY = np.max(peaks)
-        maxY_right = peaks[-1]
         holes = self.get_holes(board, peaks)
         nHoles = np.sum(holes)
         total_col_with_hole = self.get_total_cols_with_hole(board, holes)
@@ -223,12 +227,19 @@ class Block_Controller(object):
             fullLines = 0
         #eval_list = np.array([fullLines, nPeaks, maxY, nHoles,
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
-        eval_list = np.array([nPeaks, maxY, nHoles,
-            x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
+
+        #20220820
+        #eval_list = np.array([fullLines, nPeaks, maxY, nHoles, x_transitions, y_transitions])
+
+        #20220824
+        eval_list = np.array([nPeaks, nHoles, total_col_with_hole, total_dy,
+            x_transitions, y_transitions, total_none_cols, maxWell, fullLines])
         
         #print("individual", self.individual)
         #print("eval_list", eval_list)
         score = np.dot(self.individual, np.transpose(eval_list))
+        if mode == Mode.ATTACK and not fullLines == 4:
+            score -= 1000 * maxY_right
         #print ("score", score)
 
         #if mode == Mode.NORMAL:

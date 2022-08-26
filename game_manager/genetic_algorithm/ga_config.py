@@ -1,9 +1,9 @@
 #GA parameter
 NIND = 9
-NGEN = 50
+NGEN = 30
 POP = 20
-CXPB = 0.9
-MUTPB = 0.1
+CXPB = 0.6
+MUTPB = 0.2
 #The tetris game parameter to learning
 GAME_LEVEL = 3
 GAME_TIME = 5
