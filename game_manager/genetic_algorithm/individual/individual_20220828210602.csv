@@ -1,0 +1,4 @@
+nPeaks,nHoles,total_col_with_hole,total_dy,x_transitions,y_transitions,total_none_cols,maxWell,fullLines
+2.90205448722919e-17,6.243250928413914e-17
+NIND,NGEN,POP,CXPB,MUTPB
+2,100,1000,0.5,0.2

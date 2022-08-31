@@ -103,8 +103,10 @@ class Block_Controller(object):
             reader = csv.reader(csv_file)
             ind_list = []
             for row in reader:
-                for col in row:
-                    ind_list.append(float(col))
+                if reader.line_num == 2:
+                    for col in row:
+                        ind_list.append(float(col))
+                    break
             return np.array(ind_list)
 
     def getSearchXRange(self, Shape_class, direction):
