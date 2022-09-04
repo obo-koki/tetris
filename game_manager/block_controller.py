@@ -1,16 +1,13 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-
-from datetime import datetime
-from gettext import translation
 from time import time
 import pprint
 import copy
-import math
 from enum import Enum
 import numpy as np
 import csv
 import os
+from heapq import heapify, heappush, heappop, heappushpop
 
 class Mode(Enum):
     NORMAL = 1
@@ -19,13 +16,10 @@ class Mode(Enum):
 
 class Block_Controller(object):
 
-    # init parameter
-    board_backboard = 0
-    board_data_width = 0
-    board_data_height = 0
-    ShapeNone_index = 0
-    CurrentShape_class = 0
-    NextShape_class = 0
+    def __init__(self):
+        # init parameter
+        self.individual = self.get_individual(csv_file = 
+            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
 
     # GetNextMove is main function.
     # input
@@ -60,37 +54,48 @@ class Block_Controller(object):
 
         # search best nextMove -->
         mode = self.decideMode(self.board_backboard_np)
-        self.individual = self.get_individual(csv_file = os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
-        strategy = None
-        LatestEvalValue = -100000
         # search with current block Shape
+        # select top {beam width} strategy
+        beam_width = 10
+        top_strategy = []
+        heapify(top_strategy)
         for direction0 in CurrentShapeDirectionRange:
             # search with x range
             x0Min, x0Max = self.getSearchXRange(self.CurrentShape_class, direction0)
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
                 board, dy= self.getDropDownBoard(self.board_backboard_np, self.CurrentShape_class, direction0, x0)
-
                 # evaluate board
                 EvalValue = self.calcEvaluationValue(board, dy, mode)
+                # get board removed fullLines
+                board, _ = self.removeFullLines(board)
+                strategy = (direction0, x0, 1, 1)
                 # update best move
-                if EvalValue > LatestEvalValue:
-                    strategy = (direction0, x0, 1, 1)
-                    LatestEvalValue = EvalValue
-
-                ###test
-                ###for direction1 in NextShapeDirectionRange:
-                ###  x1Min, x1Max = self.getSearchXRange(self.NextShape_class, direction1)
-                ###  for x1 in range(x1Min, x1Max):
-                ###        board2 = self.getBoard(board, self.NextShape_class, direction1, x1)
-                ###        EvalValue = self.calcEvaluationValueSample(board2)
-                ###        if EvalValue > LatestEvalValue:
-                ###            strategy = (direction0, x0, 1, 1)
-                ###            LatestEvalValue = EvalValue
+                if len(top_strategy) < beam_width:
+                    heappush(top_strategy, (EvalValue, strategy, board))
+                else:
+                    heappushpop(top_strategy, (EvalValue, strategy, board))
+        
+        strategy = None
+        LatestEvalValue = -100000
+        maxEvalValues = []
+        for _, _, board in top_strategy:
+            for direction1 in NextShapeDirectionRange:
+                x1Min, x1Max = self.getSearchXRange(self.NextShape_class, direction1)
+                for x1 in range(x1Min, x1Max):
+                    board2, dy = self.getDropDownBoard(board, self.NextShape_class, direction1, x1)
+                    EvalValue = self.calcEvaluationValue(board2, dy, mode)
+                    if EvalValue > LatestEvalValue:
+                        strategy = (direction0, x0, 1, 1)
+                        LatestEvalValue = EvalValue
+            maxEvalValues.append(LatestEvalValue)
+        
+        maxInd = maxEvalValues.index(max(maxEvalValues))
+        strategy = top_strategy[maxInd][1]
         # search best nextMove <--
 
-        #print("Mode = ", mode)
-        #print("Search time = ", time() - t1)
+        print("Mode = ", mode)
+        print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
@@ -240,7 +245,7 @@ class Block_Controller(object):
         #print("individual", self.individual)
         #print("eval_list", eval_list)
         score = np.dot(self.individual, np.transpose(eval_list))
-        if mode == Mode.ATTACK and not fullLines == 4:
+        if mode == Mode.ATTACK and fullLines < 3:
             score -= 1000 * maxY_right
         #print ("score", score)
 
