@@ -8,6 +8,7 @@ import numpy as np
 from deap import base, creator, tools, algorithms
 from ga_config import NIND, NGEN, POP, CXPB, MUTPB, GAME_LEVEL, GAME_TIME, DROP_INTERVAL
 import matplotlib.pyplot as plt
+import multiprocessing
 
 GAME_CNT = 0
 GEN = 0
@@ -77,14 +78,19 @@ def eval_ind(individual):
     GAME_CNT += 1
     return get_result(),
 
-def start():
+if __name__ == '__main__':
     #Seed update
     random.seed(int(time.time() * 100000000))
 
+    #Define problem
     creator.create("FitnessMax", base.Fitness, weights=(1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
+    #Multiprocessing module
+    pool = multiprocessing.Pool()
+    toolbox.register("map", pool.map)
+    #Add operation to make individual
     toolbox.register("attribute", random.uniform, -1,1)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attribute, NIND)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
@@ -184,6 +190,3 @@ def start():
     make_pop_csv(pop, file_name=pop_file_name)
     make_process_csv(means, stds, file_name=process_file_name)
     make_graph(means, stds)
-
-if __name__ == '__main__':
-    start()

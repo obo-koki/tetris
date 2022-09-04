@@ -94,8 +94,8 @@ class Block_Controller(object):
         strategy = top_strategy[maxInd][1]
         # search best nextMove <--
 
-        print("Mode = ", mode)
-        print("Search time = ", time() - t1)
+        #print("Mode = ", mode)
+        #print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
