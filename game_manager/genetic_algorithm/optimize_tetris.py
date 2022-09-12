@@ -45,8 +45,7 @@ def execute_tetris_game(random_seed):
         + ' ' + '--game_level' + ' ' + str(GAME_LEVEL) \
         + ' ' + '--game_time' + ' ' + str(GAME_TIME) \
         + ' ' + '--drop_interval' + ' ' + str(DROP_INTERVAL)\
-        + ' ' + '--random_seed' + ' ' + str(random_seed)\
-        + ' ' + '--BlockNumMax' + ' ' + '180'
+        + ' ' + '--random_seed' + ' ' + str(random_seed)
     ret = subprocess.run(cmd, shell=True)
     if ret.returncode != 0:
         print('error: subprocess failed.', file=sys.stderr)

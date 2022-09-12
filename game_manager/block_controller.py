@@ -56,9 +56,8 @@ class Block_Controller(object):
         mode = self.decideMode(self.board_backboard_np)
         # search with current block Shape
         # select top {beam width} strategy
-        beam_width = 10
-        top_strategy = []
-        heapify(top_strategy)
+        strategy = None
+        LatestEvalValue = -100000
         for direction0 in CurrentShapeDirectionRange:
             # search with x range
             x0Min, x0Max = self.getSearchXRange(self.CurrentShape_class, direction0)
@@ -67,34 +66,13 @@ class Block_Controller(object):
                 board, dy= self.getDropDownBoard(self.board_backboard_np, self.CurrentShape_class, direction0, x0)
                 # evaluate board
                 EvalValue = self.calcEvaluationValue(board, dy, mode)
-                # get board removed fullLines
-                board, _ = self.removeFullLines(board)
-                strategy = (direction0, x0, 1, 1)
                 # update best move
-                if len(top_strategy) < beam_width:
-                    heappush(top_strategy, (EvalValue, strategy, board))
-                else:
-                    heappushpop(top_strategy, (EvalValue, strategy, board))
-        
-        strategy = None
-        LatestEvalValue = -100000
-        maxEvalValues = []
-        for _, _, board in top_strategy:
-            for direction1 in NextShapeDirectionRange:
-                x1Min, x1Max = self.getSearchXRange(self.NextShape_class, direction1)
-                for x1 in range(x1Min, x1Max):
-                    board2, dy = self.getDropDownBoard(board, self.NextShape_class, direction1, x1)
-                    EvalValue = self.calcEvaluationValue(board2, dy, mode)
-                    if EvalValue > LatestEvalValue:
-                        strategy = (direction0, x0, 1, 1)
-                        LatestEvalValue = EvalValue
-            maxEvalValues.append(LatestEvalValue)
-        
-        maxInd = maxEvalValues.index(max(maxEvalValues))
-        strategy = top_strategy[maxInd][1]
+                if EvalValue > LatestEvalValue:
+                    strategy = (direction0, x0, 1, 1)
+                    LatestEvalValue = EvalValue
         # search best nextMove <--
 
-        print("Mode = ", mode)
+        #print("Mode = ", mode)
         #print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
@@ -230,8 +208,8 @@ class Block_Controller(object):
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
 
         #20220810-2
-        if fullLines < 3:
-            fullLines = 0
+        #if fullLines < 3:
+            #fullLines = 0
         #eval_list = np.array([fullLines, nPeaks, maxY, nHoles,
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
 
@@ -245,8 +223,8 @@ class Block_Controller(object):
         #print("individual", self.individual)
         #print("eval_list", eval_list)
         score = np.dot(self.individual, np.transpose(eval_list))
-        if mode == Mode.ATTACK and fullLines < 3:
-            score -= 1000 * maxY_right
+        #if mode == Mode.ATTACK and fullLines < 3:
+            #score -= 1000 * maxY_right
         #print ("score", score)
 
         #if mode == Mode.NORMAL:
