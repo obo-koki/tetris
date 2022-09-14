@@ -7,7 +7,6 @@ from enum import Enum
 import numpy as np
 import csv
 import os
-from heapq import heapify, heappush, heappop, heappushpop
 
 class Mode(Enum):
     NORMAL = 1
@@ -217,8 +216,10 @@ class Block_Controller(object):
         #eval_list = np.array([fullLines, nPeaks, maxY, nHoles, x_transitions, y_transitions])
 
         #20220824
-        eval_list = np.array([nPeaks, nHoles, total_col_with_hole, total_dy,
-            x_transitions, y_transitions, total_none_cols, maxWell, fullLines])
+        #eval_list = np.array([nPeaks, nHoles, total_col_with_hole, total_dy,
+            #x_transitions, y_transitions, total_none_cols, maxWell, fullLines])
+        eval_list = np.array([nPeaks, maxY, nHoles,
+            x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
         
         #print("individual", self.individual)
         #print("eval_list", eval_list)

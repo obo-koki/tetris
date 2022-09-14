@@ -11,9 +11,7 @@ import matplotlib.pyplot as plt
 import multiprocessing
 import pickle
 
-GAME_CNT = 0
-GEN = 0
-SEED = 0
+gen = 0
 
 ROW_NAME = ["nPeaks", "nHoles", "total_col_with_hole", "total_dy",
             "x_transitions", "y_transitions", "total_none_cols", "maxWell", "fullLines"]
@@ -57,10 +55,9 @@ def get_result():
     return result['judge_info']['score']
     
 def eval_ind(individual):
-    global GAME_CNT, GEN, SEED
+    global gen
     make_ind_csv(individual)
-    execute_tetris_game(SEED)
-    GAME_CNT += 1
+    execute_tetris_game(gen)
     return get_result(),
 
 if __name__ == '__main__':
@@ -188,7 +185,7 @@ if __name__ == '__main__':
 
     #Save optimize log
     checkpoint_file_name = "individual/check_point_" + str(date) + ".csv"
-    with open("checkpoint_name.pkl", "wb") as cp_file:
+    with open(checkpoint_file_name, "wb") as cp_file:
         cp = dict(population=pop, generation=gen, halloffame=hof,
                     logbook=log, rndstate=random.getstate())
         pickle.dump(cp, cp_file)

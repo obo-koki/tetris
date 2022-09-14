@@ -1,6 +1,6 @@
 #GA parameter
 NIND = 9
-NGEN = 20
+NGEN = 80
 POP = 100
 CXPB = 0.6
 MUTPB = 0.2
