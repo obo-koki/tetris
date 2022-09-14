@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 from time import time
-import pprint
 import copy
 from enum import Enum
 import numpy as np
 import csv
 import os
-from heapq import heapify, heappush, heappop, heappushpop
+from heapq import heapify, heappush, heappop, heappushpop, nlargest
+import copy
 
 class Mode(Enum):
     NORMAL = 1
@@ -43,6 +43,14 @@ class Block_Controller(object):
         # next shape info
         NextShapeDirectionRange = GameStatus["block_info"]["nextShape"]["direction_range"]
         self.NextShape_class = GameStatus["block_info"]["nextShape"]["class"]
+        # shape list
+        ShapeListDirectionRange = []
+        ShapeListClass = []
+        for i in range(1,6):
+            ElementNo = "element" + str(i)
+            ShapeListDirectionRange.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["direction_range"])
+            ShapeListClass.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["class"])
+
         # current board info
         self.board_backboard = GameStatus["field_info"]["backboard"]
         # default board definition
@@ -59,6 +67,8 @@ class Block_Controller(object):
         beam_width = 10
         top_strategy = []
         heapify(top_strategy)
+
+        count = 0
         for direction0 in CurrentShapeDirectionRange:
             # search with x range
             x0Min, x0Max = self.getSearchXRange(self.CurrentShape_class, direction0)
@@ -67,35 +77,40 @@ class Block_Controller(object):
                 board, dy= self.getDropDownBoard(self.board_backboard_np, self.CurrentShape_class, direction0, x0)
                 # evaluate board
                 EvalValue = self.calcEvaluationValue(board, dy, mode)
-                # get board removed fullLines
+                # get board removed fulllines
                 board, _ = self.removeFullLines(board)
                 strategy = (direction0, x0, 1, 1)
                 # update best move
                 if len(top_strategy) < beam_width:
-                    heappush(top_strategy, (EvalValue, strategy, board))
+                    heappush(top_strategy, (EvalValue, count, strategy, board))
                 else:
-                    heappushpop(top_strategy, (EvalValue, strategy, board))
+                    heappushpop(top_strategy, (EvalValue, count, strategy, board))
+                count += 1
         
-        strategy = None
-        LatestEvalValue = -100000
-        maxEvalValues = []
-        for _, _, board in top_strategy:
-            for direction1 in NextShapeDirectionRange:
-                x1Min, x1Max = self.getSearchXRange(self.NextShape_class, direction1)
-                for x1 in range(x1Min, x1Max):
-                    board2, dy = self.getDropDownBoard(board, self.NextShape_class, direction1, x1)
-                    EvalValue = self.calcEvaluationValue(board2, dy, mode)
-                    if EvalValue > LatestEvalValue:
-                        strategy = (direction0, x0, 1, 1)
-                        LatestEvalValue = EvalValue
-            maxEvalValues.append(LatestEvalValue)
+        for i in range(5):
+            next_strategy = []
+            heapify(next_strategy)
+            for _,_, strategy, board in top_strategy:
+                for direction1 in ShapeListDirectionRange[i]:
+                    x1Min, x1Max = self.getSearchXRange(ShapeListClass[i], direction1)
+                    for x1 in range(x1Min, x1Max):
+                        board2, dy = self.getDropDownBoard(board, ShapeListClass[i], direction1, x1)
+                        EvalValue = self.calcEvaluationValue(board2, dy, mode)
+                        board2, _ = self.removeFullLines(board2)
+                        # update best move
+                        if len(next_strategy) < beam_width:
+                            heappush(next_strategy, (EvalValue, count, strategy, board2))
+                        else:
+                            heappushpop(next_strategy, (EvalValue, count, strategy, board2))
+                        count +=1
+            top_strategy = copy.deepcopy(next_strategy)
         
-        maxInd = maxEvalValues.index(max(maxEvalValues))
-        strategy = top_strategy[maxInd][1]
+        max_strategy = nlargest(1, top_strategy)
+        strategy = max_strategy[0][2]
         # search best nextMove <--
 
-        #print("Mode = ", mode)
-        #print("Search time = ", time() - t1)
+        print("Mode = ", mode)
+        print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
