@@ -2,17 +2,12 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
-import pprint
 import random
-
 import copy
 import torch
 import torch.nn as nn
 import sys
 sys.path.append("game_manager/machine_learning/")
-import omegaconf
-from hydra import compose, initialize
-
 import os
 from tensorboardX import SummaryWriter
 from collections import deque
@@ -21,7 +16,6 @@ import shutil
 import glob 
 import numpy as np
 import yaml
-import subprocess
 class Block_Controller(object):
 
     # init parameter
@@ -42,7 +36,7 @@ class Block_Controller(object):
 
     #パラメータ読み込み
     def yaml_read(self,yaml_file):
-        with open(yaml_file) as f:
+        with open(yaml_file, encoding='utf-8') as f:
             cfg = yaml.safe_load(f)
         return cfg
 
@@ -67,7 +61,7 @@ class Block_Controller(object):
             raise Exception('The yaml file {} is not existed.'.format(yaml_file))
         cfg = self.yaml_read(yaml_file)
 
-        subprocess.run("cp config/default.yaml %s/"%(self.output_dir), shell=True)
+        shutil.copy2(yaml_file, self.output_dir)
         self.writer = SummaryWriter(self.output_dir+"/"+cfg["common"]["log_path"])
 
         if self.mode=="predict" or self.mode=="predict_sample":
@@ -130,8 +124,8 @@ class Block_Controller(object):
                     print("Finetuning mode\nLoad {}...".format(self.ft_weight), file=f)
                 
             
-        if torch.cuda.is_available():
-            self.model.cuda()
+#        if torch.cuda.is_available():
+#            self.model.cuda()
         
         #=====Set hyper parameter=====
         self.batch_size = cfg["train"]["batch_size"]
@@ -530,8 +524,8 @@ class Block_Controller(object):
             next_actions, next_states = zip(*next_steps.items())
             next_states = torch.stack(next_states)
                        
-            if torch.cuda.is_available():
-                next_states = next_states.cuda()
+#            if torch.cuda.is_available():
+#                next_states = next_states.cuda()
         
             self.model.train()
             with torch.no_grad():
@@ -554,8 +548,8 @@ class Block_Controller(object):
                 next２_steps =self.get_next_func(next_backboard,next_piece_id,next_shape_class)
                 next2_actions, next2_states = zip(*next２_steps.items())
                 next2_states = torch.stack(next2_states)
-                if torch.cuda.is_available():
-                    next2_states = next2_states.cuda()
+#                if torch.cuda.is_available():
+#                    next2_states = next2_states.cuda()
                 self.model.train()
                 with torch.no_grad():
                     next_predictions = self.model(next2_states)[:, 0]
@@ -568,8 +562,8 @@ class Block_Controller(object):
                 next２_steps =self.get_next_func(next_backboard,next_piece_id,next_shape_class)
                 next2_actions, next2_states = zip(*next２_steps.items())
                 next2_states = torch.stack(next2_states)
-                if torch.cuda.is_available():
-                    next2_states = next2_states.cuda()
+#                if torch.cuda.is_available():
+#                    next2_states = next2_states.cuda()
                 self.target_model.train()
                 with torch.no_grad():
                     next_predictions = self.target_model(next2_states)[:, 0]
@@ -582,8 +576,8 @@ class Block_Controller(object):
                 next２_steps =self.get_next_func(next_backboard,next_piece_id,next_shape_class)
                 next2_actions, next2_states = zip(*next２_steps.items())
                 next2_states = torch.stack(next2_states)
-                if torch.cuda.is_available():
-                    next2_states = next2_states.cuda()
+#                if torch.cuda.is_available():
+#                    next2_states = next2_states.cuda()
                 self.model.train()
                 with torch.no_grad():
                     next_predictions = self.model(next2_states)[:, 0]

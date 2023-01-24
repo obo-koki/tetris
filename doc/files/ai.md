@@ -13,7 +13,6 @@ pip3 install torch torchvision torchaudio
 pip3 install torch torchvision torchaudio
 ```
 
-
 # 2.学習と推論
 
 * サンプルとして下記の２つのニューラルネットワークが 
@@ -47,14 +46,23 @@ python start.py -m predict_sample -l 2 --predict_weight weight/DQN/sample_weight
 ```
 python start.py -m predict_sample2 -l 2 --predict_weight weight/MLP/sample_weight.pt
 ```
-### 2.2.1 -m オプションについて
+
+## 2.3 再学習/追加学習（Fine Tuning) の実行
+- 学習済みの重みを初期状態として学習する場合は下記の手順で　configのyamlファイルを設定する。
+1. ft_weight に学習済み重みファイルのパスを設定
+2. finetune を　False → True に変更
+3. initial_epsilon を小さくする（0より大きい１以下の値）
+
+- initial_epsilon は ε-greedy法というアルゴリズムのパラメータになり、学習初期ににどの程度ランダムな行動を取るかを設定します。追加学習の場合は、小さい値を設定することで、学習済みのモデルを有効活用できます。
+- ε-greedy法については下記のサイトなどが参考になります。
+    - [https://horomary.hatenablog.com/entry/2021/01/26/233351](https://horomary.hatenablog.com/entry/2021/01/26/233351)
+
+## 2.4 -m オプションについて
  - 学習/推論の切り替えおよびサンプル/本番コードの切り替には　"-m"　オプションを使用します。
 
 **※ sampleコードは基本的に変更せず、[本番用コード](../../game_manager/machine_learning/block_controller_train.py )で開発してください**
 
 - "-m" オプションに対して下記の引数を渡すことで書くモードを切り替えられる。
-
-
 
 |オプション名|説明|
 | ---- | ---- |
@@ -66,7 +74,7 @@ python start.py -m predict_sample2 -l 2 --predict_weight weight/MLP/sample_weigh
 | predict| [本番用コード](../../game_manager/machine_learning/block_controller_train.py ) を用いて学習を行う　<br> 実行時に--predict_weight オプションにより重みのパスを選択する必要があります。|
 
 
-### 2.2.2 AI関連のその他オプションについて
+## 2.5 AI関連のその他オプションについて
 - AI学習関連のオプションは下記
 
 |オプション名|引数|説明| train or predict|
@@ -165,7 +173,35 @@ python start.py -m predict_sample2 -l 2 --predict_weight weight/MLP/sample_weigh
     - replay_memory_size　（学習に使用するメモリ量が大きくなるので注意）
 
 
+# 5.チュートリアルの実行
+- サンプル用のコードを試すための[チュートリアル用Jupyter-notebook]()../../game_manager/machine_learning/)
+を用意しているので、コード理解のためにお使いください。
 
+- Jupyter-notebookか下記の手順で使用できます.
+- 1. Jupyter-notebookのインストール
+```
+pip install jupyter
+```
 
+- 2. Jupyter-notebookの起動
+```
+jupyter notebook
+```
+下記のような画面が、ブラウザで開かれるので
+game_manager > machine_learning > model > tutorial 
+の準備進み、***.ipynb ファイルを開いてください。
+![Screenshot](../../doc/pics/jupyter-sample.png)
 
+- Jupyter-notebook のセルは　Shit＋Enter key で実行できます
+
+- Jupyter-notebook の使い方は下記のサイトなどが参考になります。
+[https://qiita.com/takuyanin/items/8bf396e7b6b051670147](https://qiita.com/takuyanin/items/8bf396e7b6b051670147)
+
+- venv などの仮想環境を用いている場合は下記のサイトなどが参考になります。
 　　
+[https://qiita.com/smiler5617/items/e0d9b3034d79457cc253](https://qiita.com/smiler5617/items/e0d9b3034d79457cc253)
+
+# 6. さらなる強化に向けて
+- 第3回での cookie4869 の強化資料を下記で共有いたします。
+
+![AI強化資料](../pics/20220920_Tetris_AI.pdf)
