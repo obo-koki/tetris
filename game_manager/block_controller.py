@@ -109,7 +109,7 @@ class Block_Controller(object):
         strategy = max_strategy[0][2]
         # search best nextMove <--
 
-        #print("Mode = ", mode)
+        print("Mode = ", mode)
         #print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
@@ -202,13 +202,15 @@ class Block_Controller(object):
         return _board
     
     def decideMode(self, board):
-        mode = Mode.NORMAL
+        mode = Mode.DEFENCE
         peaks = self.get_peaks(board)
         maxY = np.max(peaks)
         holes = self.get_holes(board, peaks)
         n_holes = np.sum(holes)
         wells = self.get_wells(board, peaks)
         second_well = np.sort(wells)[-2]
+        if second_well < 5 and maxY < 15 and n_holes < 4:
+            mode = Mode.NORMAL
         if second_well < 5 and maxY < 12 and n_holes < 4:
             mode = Mode.ATTACK
         #print("mode:", mode)
@@ -260,8 +262,12 @@ class Block_Controller(object):
         #print("individual", self.individual)
         #print("eval_list", eval_list)
         score = np.dot(self.individual, np.transpose(eval_list))
-        if mode == Mode.ATTACK and fullLines < 3:
+        if mode == Mode.NORMAL and fullLines < 3:
             score -= 1000 * maxY_right
+
+        if mode == Mode.ATTACK and fullLines < 4:
+            score -= 1000 * maxY_right
+
         #print ("score", score)
 
         #if mode == Mode.NORMAL:
