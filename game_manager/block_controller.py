@@ -10,7 +10,7 @@ from heapq import heapify, heappush, heappop, heappushpop, nlargest
 import copy
 import logging
 
-logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
 
 class Mode(Enum):
     NORMAL = 1
@@ -25,6 +25,7 @@ class Block_Controller(object):
             os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
         self.beam_width = 10
         self.estimate_num = 5
+        self.hold = False
         
 
     # GetNextMove is main function.
@@ -65,13 +66,12 @@ class Block_Controller(object):
         # change board list in numpy list
         self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_data_height, self.board_data_width)
 
-        # search best nextMove -->
+        # Decide mode
         mode = self.decideMode(self.board_backboard_np)
-        # search with current block Shape
-        # select top {beam width} strategy
         top_strategy = []
         heapify(top_strategy)
 
+        # current shape search
         count = 0
         for direction0 in CurrentShapeDirectionRange:
             # search with x range
@@ -80,10 +80,10 @@ class Block_Controller(object):
                 # get board data, as if dropdown block
                 board, dy= self.getDropDownBoard(self.board_backboard_np, CurrentShapeClass, direction0, x0)
                 # evaluate board
-                EvalValue = self.calcEvaluationValue(board, dy, mode)
+                EvalValue = self.calcEvaluationValue(board, dy, CurrentShapeClass, mode)
                 # get board removed fulllines
                 board, _ = self.removeFullLines(board)
-                strategy = (direction0, x0, 1, 1)
+                strategy = (direction0, x0, 1, 1, 'n')
                 # update best move
                 if len(top_strategy) < self.beam_width:
                     heappush(top_strategy, (EvalValue, count, strategy, board))
@@ -91,15 +91,36 @@ class Block_Controller(object):
                     heappushpop(top_strategy, (EvalValue, count, strategy, board))
                 count += 1
         
+        if self.hold:
+            #Hold shape search
+            for direction0 in HoldShapeDirectionRange:
+                # search with x range
+                x0Min, x0Max = self.getSearchXRange(HoldShapeClass, direction0)
+                for x0 in range(x0Min, x0Max):
+                    # get board data, as if dropdown block
+                    board, dy= self.getDropDownBoard(self.board_backboard_np, HoldShapeClass, direction0, x0)
+                    # evaluate board
+                    EvalValue = self.calcEvaluationValue(board, dy, HoldShapeClass, mode)
+                    # get board removed fulllines
+                    board, _ = self.removeFullLines(board)
+                    strategy = (direction0, x0, 1, 1, 'y')
+                    # update best move
+                    if len(top_strategy) < self.beam_width:
+                        heappush(top_strategy, (EvalValue, count, strategy, board))
+                    else:
+                        heappushpop(top_strategy, (EvalValue, count, strategy, board))
+                    count += 1
+
+        
         for i in range(self.estimate_num):
             next_strategy = []
             heapify(next_strategy)
-            for _,_, strategy, board in top_strategy:
+            for lasteval,_, strategy, board in top_strategy:
                 for direction1 in ShapeListDirectionRange[i]:
                     x1Min, x1Max = self.getSearchXRange(ShapeListClass[i], direction1)
                     for x1 in range(x1Min, x1Max):
                         board2, dy = self.getDropDownBoard(board, ShapeListClass[i], direction1, x1)
-                        EvalValue = self.calcEvaluationValue(board2, dy, mode)
+                        EvalValue = self.calcEvaluationValue(board2, dy, ShapeListClass[i], mode) + lasteval
                         board2, _ = self.removeFullLines(board2)
                         # update best move
                         if len(next_strategy) < self.beam_width:
@@ -111,18 +132,19 @@ class Block_Controller(object):
         
         max_strategy = nlargest(1, top_strategy)
         strategy = max_strategy[0][2]
-        # search best nextMove <--
 
         logging.debug('Mode: {}'.format(mode))
-        #print("Search time = ", time() - t1)
+        logging.debug('Search time: {}'.format(time() - t1))
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
         nextMove["strategy"]["y_moveblocknum"] = strategy[3]
-        #print(nextMove)
+        if self.hold:
+            nextMove["strategy"]["use_hold_function"] = strategy[4]
+        else:
+            nextMove["strategy"]["use_hold_function"] = "y"
+            self.hold = True
 
-        #use HOLD function
-        nextMove["strategy"]["use_hold_function"] = "n"
         return nextMove
 
     def get_individual(self, csv_file = "individual.csv"):
@@ -223,7 +245,7 @@ class Block_Controller(object):
         #print("mode:", mode)
         return mode
 
-    def calcEvaluationValue(self, board, dy, mode = Mode.ATTACK):
+    def calcEvaluationValue(self, board, dy, ShapeListClass, mode = Mode.ATTACK):
         # calc Evaluation Value
 
         #before remove full lines
@@ -244,6 +266,7 @@ class Block_Controller(object):
         wells = self.get_wells(board, peaks)
         maxWell = np.max(wells)
         total_none_cols = self.get_total_none_cols(board)
+        dy_right = peaks[-2] - peaks[-1]
 
         #20220806
         #eval_list = np.array([fullLines, nPeaks, maxY, maxY_right, nHoles, total_col_with_hole,
@@ -254,8 +277,8 @@ class Block_Controller(object):
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
 
         #20220810-2
-        if fullLines < 3:
-            fullLines = 0
+        #if fullLines < 3:
+            #fullLines = 0
         #eval_list = np.array([fullLines, nPeaks, maxY, nHoles,
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
 
@@ -269,31 +292,20 @@ class Block_Controller(object):
         #print("individual", self.individual)
         #print("eval_list", eval_list)
         score = np.dot(self.individual, np.transpose(eval_list))
+        #if not ShapeListClass.shape == 1:
+            #if mode == Mode.NORMAL and fullLines < 3:
+                #score += 1000 * dy_right
+
         if mode == Mode.NORMAL and fullLines < 3:
             score -= 1000 * maxY_right
+        
+        if fullLines == 4:
+            score += 10000
 
         #if mode == Mode.ATTACK and fullLines < 4:
             #score -= 1000 * maxY_right
 
         #print ("score", score)
-
-        #if mode == Mode.NORMAL:
-            #score -= nHoles * 10
-            #score -= maxY * 50
-            #score -= nPeaks * 1
-            #score += dy * 1
-        #elif mode == Mode.DEFENCE:
-            #score -= nHoles * 10
-            #score -= maxY * 50
-            #score -= nPeaks * 1
-            #score += dy * 1
-        #elif mode == Mode.ATTACK:
-            #if fullLines < 3:
-                #score -= 1000 * maxY_right
-            #score -= nHoles * 100
-            #score -= maxY * 5
-            #score -= nPeaks * 1
-            #score += dy * 1
         return score
     
     def get_peaks(self, board):
