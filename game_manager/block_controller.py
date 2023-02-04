@@ -8,6 +8,9 @@ import csv
 import os
 from heapq import heapify, heappush, heappop, heappushpop, nlargest
 import copy
+import logging
+
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
 
 class Mode(Enum):
     NORMAL = 1
@@ -32,24 +35,23 @@ class Block_Controller(object):
 
         t1 = time()
 
-        # print GameStatus
-        #print("=================================================>")
-        #pprint.pprint(GameStatus, width = 61, compact = True)
-
-        # get data from GameStatus
+        ## Get data from GameStatus
         # current shape info
         CurrentShapeDirectionRange = GameStatus["block_info"]["currentShape"]["direction_range"]
         self.CurrentShape_class = GameStatus["block_info"]["currentShape"]["class"]
+        logging.debug('CurrentShapeClass: {}'.format(self.CurrentShape_class))
         # next shape info
-        NextShapeDirectionRange = GameStatus["block_info"]["nextShape"]["direction_range"]
-        self.NextShape_class = GameStatus["block_info"]["nextShape"]["class"]
-        # shape list
         ShapeListDirectionRange = []
         ShapeListClass = []
         for i in range(1,6):
             ElementNo = "element" + str(i)
             ShapeListDirectionRange.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["direction_range"])
             ShapeListClass.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["class"])
+            logging.debug('ShapeListClass {}:{}'.format(ElementNo, GameStatus["block_info"]["nextShapeList"][ElementNo]["class"]))
+        # hold shape info
+        HoldShapeDirectionRange = GameStatus["block_info"]["holdShape"]["direction_range"]
+        HoldShapeClass = GameStatus["block_info"]["holdShape"]["class"]
+        logging.debug('HoldShapeClass: {}'.format(HoldShapeClass))
 
         # current board info
         self.board_backboard = GameStatus["field_info"]["backboard"]
@@ -109,13 +111,16 @@ class Block_Controller(object):
         strategy = max_strategy[0][2]
         # search best nextMove <--
 
-        print("Mode = ", mode)
+        logging.debug('Mode: {}'.format(mode))
         #print("Search time = ", time() - t1)
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
         nextMove["strategy"]["y_moveblocknum"] = strategy[3]
         #print(nextMove)
+
+        #use HOLD function
+        nextMove["strategy"]["use_hold_function"] = "n"
         return nextMove
 
     def get_individual(self, csv_file = "individual.csv"):
@@ -211,8 +216,8 @@ class Block_Controller(object):
         second_well = np.sort(wells)[-2]
         if second_well < 5 and maxY < 15 and n_holes < 4:
             mode = Mode.NORMAL
-        if second_well < 5 and maxY < 12 and n_holes < 4:
-            mode = Mode.ATTACK
+        #if second_well < 5 and maxY < 12 and n_holes < 4:
+            #mode = Mode.ATTACK
         #print("mode:", mode)
         return mode
 
@@ -265,8 +270,8 @@ class Block_Controller(object):
         if mode == Mode.NORMAL and fullLines < 3:
             score -= 1000 * maxY_right
 
-        if mode == Mode.ATTACK and fullLines < 4:
-            score -= 1000 * maxY_right
+        #if mode == Mode.ATTACK and fullLines < 4:
+            #score -= 1000 * maxY_right
 
         #print ("score", score)
 
