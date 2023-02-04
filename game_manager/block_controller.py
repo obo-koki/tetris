@@ -23,6 +23,9 @@ class Block_Controller(object):
         # init parameter
         self.individual = self.get_individual(csv_file = 
             os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
+        self.beam_width = 10
+        self.estimate_num = 5
+        
 
     # GetNextMove is main function.
     # input
@@ -38,8 +41,8 @@ class Block_Controller(object):
         ## Get data from GameStatus
         # current shape info
         CurrentShapeDirectionRange = GameStatus["block_info"]["currentShape"]["direction_range"]
-        self.CurrentShape_class = GameStatus["block_info"]["currentShape"]["class"]
-        logging.debug('CurrentShapeClass: {}'.format(self.CurrentShape_class))
+        CurrentShapeClass = GameStatus["block_info"]["currentShape"]["class"]
+        logging.debug('CurrentShapeClass: {}'.format(CurrentShapeClass))
         # next shape info
         ShapeListDirectionRange = []
         ShapeListClass = []
@@ -66,30 +69,29 @@ class Block_Controller(object):
         mode = self.decideMode(self.board_backboard_np)
         # search with current block Shape
         # select top {beam width} strategy
-        beam_width = 10
         top_strategy = []
         heapify(top_strategy)
 
         count = 0
         for direction0 in CurrentShapeDirectionRange:
             # search with x range
-            x0Min, x0Max = self.getSearchXRange(self.CurrentShape_class, direction0)
+            x0Min, x0Max = self.getSearchXRange(CurrentShapeClass, direction0)
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
-                board, dy= self.getDropDownBoard(self.board_backboard_np, self.CurrentShape_class, direction0, x0)
+                board, dy= self.getDropDownBoard(self.board_backboard_np, CurrentShapeClass, direction0, x0)
                 # evaluate board
                 EvalValue = self.calcEvaluationValue(board, dy, mode)
                 # get board removed fulllines
                 board, _ = self.removeFullLines(board)
                 strategy = (direction0, x0, 1, 1)
                 # update best move
-                if len(top_strategy) < beam_width:
+                if len(top_strategy) < self.beam_width:
                     heappush(top_strategy, (EvalValue, count, strategy, board))
                 else:
                     heappushpop(top_strategy, (EvalValue, count, strategy, board))
                 count += 1
         
-        for i in range(5):
+        for i in range(self.estimate_num):
             next_strategy = []
             heapify(next_strategy)
             for _,_, strategy, board in top_strategy:
@@ -100,7 +102,7 @@ class Block_Controller(object):
                         EvalValue = self.calcEvaluationValue(board2, dy, mode)
                         board2, _ = self.removeFullLines(board2)
                         # update best move
-                        if len(next_strategy) < beam_width:
+                        if len(next_strategy) < self.beam_width:
                             heappush(next_strategy, (EvalValue, count, strategy, board2))
                         else:
                             heappushpop(next_strategy, (EvalValue, count, strategy, board2))
