@@ -9,8 +9,11 @@ import os
 from heapq import heapify, heappush, heappop, heappushpop, nlargest
 import copy
 import logging
+import pandas as pd
 
-logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
+#logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
+path = "time_result.xlsx"
 
 class Mode(Enum):
     NORMAL = 1
@@ -26,7 +29,22 @@ class Block_Controller(object):
         self.beam_width = 10
         self.estimate_num = 5
         self.hold = False
-        
+        self.xmin_max_list = [
+            [[0,0]], #Shape None
+            [[0,10],[2,9]], # Shape I
+            [[0,9],[1,9],[1,10],[1,9]], # Shape L
+            [[1,10],[1,9],[0,9],[1,9]], # Shape J
+            [[0,9],[1,9],[1,10],[1,9]], # Shape T
+            [[0,9]], # Shape O
+            [[1,9],[0,9]], # Shape S
+            [[1,9],[0,9]] # Shape Z
+        ]
+        self.board_width = 10
+        self.board_height = 22
+        self.ShapeNone_index = 0
+
+        self.df_num = 0
+
 
     # GetNextMove is main function.
     # input
@@ -37,38 +55,34 @@ class Block_Controller(object):
     #    nextMove : nextMove structure which includes next shape position and the other.
     def GetNextMove(self, nextMove, GameStatus):
 
+
         start_time = time()
 
         ## Get data from GameStatus
         # current shape info
-        CurrentShapeDirectionRange = GameStatus["block_info"]["currentShape"]["direction_range"]
         CurrentShapeClass = GameStatus["block_info"]["currentShape"]["class"]
-        logging.debug('CurrentShapeClass: {}'.format(CurrentShapeClass))
+        CurrentShapeDirectionRange = GameStatus["block_info"]["currentShape"]["direction_range"]
+        logging.debug('CurrentShapeClass: {}, DirectionRange:{}'.format(CurrentShapeClass.shape, CurrentShapeDirectionRange))
         # next shape info
         ShapeListDirectionRange = []
         ShapeListClass = []
         for i in range(1,6):
             ElementNo = "element" + str(i)
-            ShapeListDirectionRange.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["direction_range"])
             ShapeListClass.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["class"])
-            logging.debug('ShapeListClass {}:{}'.format(ElementNo, GameStatus["block_info"]["nextShapeList"][ElementNo]["class"]))
+            ShapeListDirectionRange.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["direction_range"])
+            logging.debug('ShapeListClass {}:{}'.format(ElementNo, GameStatus["block_info"]["nextShapeList"][ElementNo]["class"].shape))
         # hold shape info
-        HoldShapeDirectionRange = GameStatus["block_info"]["holdShape"]["direction_range"]
         HoldShapeClass = GameStatus["block_info"]["holdShape"]["class"]
+        HoldShapeDirectionRange = GameStatus["block_info"]["holdShape"]["direction_range"]
         logging.debug('HoldShapeClass: {}'.format(HoldShapeClass))
 
         # current board info
         self.board_backboard = GameStatus["field_info"]["backboard"]
-        # default board definition
-        self.board_data_width = GameStatus["field_info"]["width"]
-        self.board_data_height = GameStatus["field_info"]["height"]
-        self.ShapeNone_index = GameStatus["debug_info"]["shape_info"]["shapeNone"]["index"]
         # change board list in numpy list
-        self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_data_height, self.board_data_width)
+        self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_height, self.board_width)
 
         t1 = time()
         
-
         # Decide mode
         mode = self.decideMode(self.board_backboard_np)
 
@@ -80,7 +94,8 @@ class Block_Controller(object):
         count = 0
         for direction0 in CurrentShapeDirectionRange:
             # search with x range
-            x0Min, x0Max = self.getSearchXRange(CurrentShapeClass, direction0)
+            x0Min, x0Max = self.xmin_max_list[CurrentShapeClass.shape][direction0]
+            logging.debug('CurrentShapeClass: {}, direction: {}, xmin: {}, xmax: {}'.format(CurrentShapeClass, direction0, x0Min, x0Max))
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
                 board, dy= self.getDropDownBoard(self.board_backboard_np, CurrentShapeClass, direction0, x0)
@@ -102,7 +117,7 @@ class Block_Controller(object):
             #Hold shape search
             for direction0 in HoldShapeDirectionRange:
                 # search with x range
-                x0Min, x0Max = self.getSearchXRange(HoldShapeClass, direction0)
+                x0Min, x0Max = self.xmin_max_list[HoldShapeClass.shape][direction0]
                 for x0 in range(x0Min, x0Max):
                     # get board data, as if dropdown block
                     board, dy= self.getDropDownBoard(self.board_backboard_np, HoldShapeClass, direction0, x0)
@@ -125,7 +140,7 @@ class Block_Controller(object):
             heapify(next_strategy)
             for lasteval,_, strategy, board in top_strategy:
                 for direction1 in ShapeListDirectionRange[i]:
-                    x1Min, x1Max = self.getSearchXRange(ShapeListClass[i], direction1)
+                    x1Min, x1Max = self.xmin_max_list[ShapeListClass[i].shape][direction1]
                     for x1 in range(x1Min, x1Max):
                         board2, dy = self.getDropDownBoard(board, ShapeListClass[i], direction1, x1)
                         EvalValue = self.calcEvaluationValue(board2, dy, ShapeListClass[i], mode) + lasteval
@@ -158,6 +173,21 @@ class Block_Controller(object):
             nextMove["strategy"]["use_hold_function"] = "y"
             self.hold = True
 
+        df = pd.DataFrame({'t1':t1-start_time,
+                           't2':t2-t1,
+                           't3':t3-t2,
+                           't4':t4-t3,
+                           't5':t5-t4,
+                           't6':t6-t5
+                           }, index=[0])
+        if self.df_num == 0:
+            self.dfs = df
+        else:
+            self.dfs = pd.concat([self.dfs,df])
+        self.df_num +=1
+
+        self.dfs.to_excel(path)
+
         return nextMove
 
     def get_individual(self, csv_file = "individual.csv"):
@@ -177,7 +207,7 @@ class Block_Controller(object):
         #
         minX, maxX, _, _ = Shape_class.getBoundingOffsets(direction) # get shape x offsets[minX,maxX] as relative value.
         xMin = -1 * minX
-        xMax = self.board_data_width - maxX
+        xMax = self.board_width - maxX
         return xMin, xMax
 
     def getShapeCoordArray(self, Shape_class, direction, x, y):
@@ -198,8 +228,8 @@ class Block_Controller(object):
         return _board, dy
     
     def removeFullLines(self, board):
-        height = board.shape[0]
-        width = board.shape[1]
+        height = self.board_height
+        width = self.board_width
         newBoard = np.zeros((height, width))
         newY = height - 1
         fullLines = 0
@@ -322,8 +352,8 @@ class Block_Controller(object):
         return score
     
     def get_peaks(self, board):
-        height = board.shape[0]
-        width = board.shape[1]
+        height = self.board_height
+        width = self.board_width
         peaks_list = []
         for x in range(width):
             block_ind = board[:, x].nonzero()
@@ -335,8 +365,8 @@ class Block_Controller(object):
         return peaks
 
     def get_holes(self, board, peaks = None):
-        height = board.shape[0]
-        width = board.shape[1]
+        height = self.board_height
+        width = self.board_width
         if peaks is None:
             peaks = self.get_peaks(board)
         holes_list = []
@@ -350,8 +380,8 @@ class Block_Controller(object):
         return holes
     
     def get_fullLines(self, board):
-        height = board.shape[0]
-        width = board.shape[1]
+        height = self.board_height
+        width = self.board_width
         fullLines = 0
         for raw in range(height):
             blocks = np.count_nonzero(board[raw] != self.ShapeNone_index)
@@ -367,8 +397,8 @@ class Block_Controller(object):
     def get_x_transitions(self, board, maxY = None):
         if maxY is None:
             maxY = self.get_maxY(board)
-        height = board.shape[0]
-        width = board.shape[1]
+        height = self.board_height
+        width = self.board_width
         transitions = 0
         for y in range(height - maxY, height):
             for x in range(1, width):
@@ -379,8 +409,8 @@ class Block_Controller(object):
     def get_y_transitions(self, board, peaks = None):
         if peaks is None:
             peaks = self.get_peaks(board)
-        height = board.shape[0]
-        width = board.shape[1]
+        height = self.board_height
+        width = self.board_width
         transitions = 0
         for x in range(width):
             for y in range(height - peaks[x], height -1):
