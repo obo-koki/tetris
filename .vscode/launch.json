@@ -24,7 +24,7 @@
             "args":["--game_time", "180", "--seed", "0", "--obstacle_height", "0","--obstacle_probability", "0", 
                     "--drop_interval","1000", "--mode", "default", "--user_name", "window_sample", "--resultlogjson","result.json",
                     "--train_yaml", "config/default.yaml", "--predict_weight", "outputs/latest/best_weight.pt", "--ShapeListMax", "6",
-                    "--BlockNumMax", "-1"
+                    "--BlockNumMax", "-1", "--art_config_filepath", "default.json"
                 ],
             "subProcess": true
         }

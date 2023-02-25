@@ -6,14 +6,15 @@ from enum import Enum
 import numpy as np
 import csv
 import os
-from heapq import heapify, heappush, heappop, heappushpop, nlargest
-import copy
+from heapq import heapify, heappush, heappushpop, nlargest
 import logging
-import pandas as pd
+import pickle
 
 #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
 logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
 path = "game_manager/measure_calc_time/time_result.xlsx"
+
+pickle_copy = lambda l: pickle.loads(pickle.dumps(l, -1))
 
 class Mode(Enum):
     NORMAL = 1
@@ -96,10 +97,12 @@ class Block_Controller(object):
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
                 board, dy= self.getDropDownBoard(self.board_backboard, CurrentShapeClass, direction0, x0)
+                #print("board_before", board)
                 # evaluate board
                 EvalValue = self.calcEvaluationValue(board, dy, CurrentShapeClass, mode)
+                #print("board_after", board)
                 # get board removed fulllines
-                board, _ = self.removeFullLines(board)
+                #board, _ = self.removeFullLines(board, self.board_height, self.board_width)
                 strategy = (direction0, x0, 1, 1, 'n')
                 # update best move
                 if len(top_strategy) < self.beam_width:
@@ -119,7 +122,7 @@ class Block_Controller(object):
                     # evaluate board
                     EvalValue = self.calcEvaluationValue(board, dy, HoldShapeClass, mode)
                     # get board removed fulllines
-                    board, _ = self.removeFullLines(board)
+                    #board, _ = self.removeFullLines(board, self.board_height, self.board_width)
                     strategy = (direction0, x0, 1, 1, 'y')
                     # update best move
                     if len(top_strategy) < self.beam_width:
@@ -137,14 +140,14 @@ class Block_Controller(object):
                     for x1 in range(x1Min, x1Max):
                         board2, dy = self.getDropDownBoard(board, ShapeListClass[i], direction1, x1)
                         EvalValue = self.calcEvaluationValue(board2, dy, ShapeListClass[i], mode) + lasteval
-                        board2, _ = self.removeFullLines(board2)
+                        #board2, _ = self.removeFullLines(board2, self.board_height, self.board_width)
                         # update best move
                         if len(next_strategy) < self.beam_width:
                             heappush(next_strategy, (EvalValue, count, strategy, board2))
                         else:
                             heappushpop(next_strategy, (EvalValue, count, strategy, board2))
                         count +=1
-            top_strategy = copy.deepcopy(next_strategy)
+            top_strategy = pickle_copy(next_strategy)
 
         max_strategy = nlargest(1, top_strategy)
         strategy = max_strategy[0][2]
@@ -196,21 +199,27 @@ class Block_Controller(object):
         #
         # copy backboard data to make new board.
         # if not, original backboard data will be updated later.
-        board = copy.deepcopy(board_backboard)
+
+        #board = copy.deepcopy(board_backboard) -> too late
+
+        #board_backboard_np = np.array(board_backboard) 
+        #board = board_backboard_np.tolist() -> faster than list deepcopy
+
+        board = pickle_copy(board_backboard) # -> fastest
         _board, dy = self.dropDown(board, Shape_class, direction, x)
         return _board, dy
     
-    def removeFullLines(self, board):
-        newBoard = [0] * self.board_width * self.board_height
-        newY = self.board_height - 1
+    def removeFullLines(self, board, height, width):
+        newBoard = [0] * width * height
+        newY = height - 1
         fullLines = 0
-        for y in range(self.board_height - 1, -1, -1):
-            blockCount = sum([1 if board[y*self.board_width + x] > 0 else 0 for x in range(self.board_width)])
-            if blockCount < self.board_width and blockCount > 0:
-                for x in range(self.board_width):
-                    newBoard[newY * self.board_width + x] = board[y * self.board_width + x]
+        for y in range(height - 1, -1, -1):
+            blockCount = sum([1 if board[y*width + x] > 0 else 0 for x in range(width)])
+            if blockCount < width and blockCount > 0:
+                for x in range(width):
+                    newBoard[newY * width + x] = board[y * width + x]
                 newY -= 1
-            elif blockCount == self.board_width:
+            elif blockCount == width:
                 fullLines += 1
         return newBoard, fullLines
 
@@ -247,7 +256,7 @@ class Block_Controller(object):
     
     def decideMode(self, board):
         mode = Mode.DEFENCE
-        peaks = self.get_peaks(board)
+        peaks = self.get_peaks(board, self.board_width, self.board_height)
         maxY = np.max(peaks)
         holes = self.get_holes(board, peaks)
         n_holes = np.sum(holes)
@@ -264,12 +273,12 @@ class Block_Controller(object):
         # calc Evaluation Value
 
         #before remove full lines
-        peaks_before = self.get_peaks(board)
+        peaks_before = self.get_peaks(board, self.board_height, self.board_width)
         maxY_right = peaks_before[-1]
 
         #after remove full lines
-        board, fullLines = self.removeFullLines(board)
-        peaks = self.get_peaks(board)
+        board, fullLines = self.removeFullLines(board, self.board_height, self.board_width)
+        peaks = self.get_peaks(board, self.board_height, self.board_width)
         nPeaks = sum(peaks)
         maxY = max(peaks)
         holes = self.get_holes(board, peaks)
@@ -327,11 +336,11 @@ class Block_Controller(object):
         #print ("score", score)
         return score
     
-    def get_peaks(self, board):
-        peaks = [0] * self.board_width
-        for x in range(self.board_width):
-            for y in range(self.board_height-1, 0, -1):
-                if board[(self.board_height - y) * self.board_width + x] != 0:
+    def get_peaks(self, board, height, width):
+        peaks = [0] * width
+        for x in range(width):
+            for y in range(height-1, 0, -1):
+                if board[(height - y) * width + x] != 0:
                     peaks[x] = y
                     break
         return peaks
