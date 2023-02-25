@@ -66,6 +66,9 @@ class Block_Controller(object):
         # change board list in numpy list
         self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_data_height, self.board_data_width)
 
+        #self.show_board(GameStatus)
+        #self.calcEvaluationValue(self.board_backboard_np, CurrentShapeClass, Mode.NORMAL)
+
         t1 = time()
         
 
@@ -299,6 +302,9 @@ class Block_Controller(object):
         #eval_list = np.array([fullLines, nPeaks, maxY, nHoles, x_transitions, y_transitions])
 
         #20220824
+        #logging.debug('nPeaks: {}, nHoles: {}, total_col_with_hole: {}, total_dy: {}, x_transitions: {}, y_transitions: {}, total_none_cols: {}, maxWell: {}, fullLines: {} '
+                    #.format(nPeaks, nHoles, total_col_with_hole, total_dy,
+                    #x_transitions, y_transitions, total_none_cols, maxWell, fullLines))
         eval_list = np.array([nPeaks, nHoles, total_col_with_hole, total_dy,
             x_transitions, y_transitions, total_none_cols, maxWell, fullLines])
         
@@ -420,5 +426,13 @@ class Block_Controller(object):
     
     def get_total_none_cols(self, board):
         return np.count_nonzero(np.count_nonzero(board, axis=0) == 0)
+
+    def show_board(self, GameStatus):
+        for jj in range(GameStatus["field_info"]["height"]):
+            tmpstr=''
+            for ii in range(GameStatus["field_info"]["width"]):
+                tmpstr = tmpstr + str(GameStatus["field_info"]["backboard"][jj*GameStatus["field_info"]["width"]+ii]) + ' '
+            print(format(jj,'02d'),tmpstr)
+        print('-- 0 1 2 3 4 5 6 7 8 9 0 --' )
 
 BLOCK_CONTROLLER = Block_Controller()
