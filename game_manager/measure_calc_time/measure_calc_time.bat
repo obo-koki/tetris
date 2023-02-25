@@ -1,1 +1,0 @@
-python -m cProfile -o calc_time.prof .\strategy_test.py

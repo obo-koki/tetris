@@ -81,12 +81,9 @@ class Block_Controller(object):
         ## change board list in numpy list
         #self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_height, self.board_width)
 
-        t1 = time()
-        
         # Decide mode
         mode = self.decideMode(self.board_backboard)
 
-        t2 = time()
         top_strategy = []
         heapify(top_strategy)
 
@@ -111,8 +108,6 @@ class Block_Controller(object):
                     heappushpop(top_strategy, (EvalValue, count, strategy, board))
                 count += 1
         
-        t3 = time()
-
         if self.hold:
             #Hold shape search
             for direction0 in HoldShapeDirectionRange:
@@ -133,8 +128,6 @@ class Block_Controller(object):
                         heappushpop(top_strategy, (EvalValue, count, strategy, board))
                     count += 1
 
-        t4 = time()
-        
         for i in range(self.estimate_num):
             next_strategy = []
             heapify(next_strategy)
@@ -153,16 +146,11 @@ class Block_Controller(object):
                         count +=1
             top_strategy = copy.deepcopy(next_strategy)
 
-        t5 = time()
-        
         max_strategy = nlargest(1, top_strategy)
         strategy = max_strategy[0][2]
 
-        t6 = time()
-
         logging.debug('Mode: {}'.format(mode))
         logging.debug('Search time: {}'.format(time() - start_time))
-        logging.debug('t1:{},t2:{},t3:{},t4:{},t5:{},t6:{}'.format(t1-start_time,t2-t1,t3-t2,t4-t3,t5-t4, t6-t5))
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
@@ -172,21 +160,6 @@ class Block_Controller(object):
         else:
             nextMove["strategy"]["use_hold_function"] = "y"
             self.hold = True
-
-        df = pd.DataFrame({'t1':t1-start_time,
-                           't2':t2-t1,
-                           't3':t3-t2,
-                           't4':t4-t3,
-                           't5':t5-t4,
-                           't6':t6-t5
-                           }, index=[0])
-        if self.df_num == 0:
-            self.dfs = df
-        else:
-            self.dfs = pd.concat([self.dfs,df])
-        self.df_num +=1
-
-        self.dfs.to_excel(path)
 
         return nextMove
 
