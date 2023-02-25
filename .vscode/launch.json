@@ -18,7 +18,7 @@
             "name": "Python: game_manager_sample",
             "type": "python",
             "request": "launch",
-            "program": "/home/koki/tetris/tetris/game_manager/game_manager.py",
+            "program": "C:/Users/koki/Desktop/tetris/game_manager/game_manager.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args":["--game_time", "180", "--seed", "0", "--obstacle_height", "0","--obstacle_probability", "0", 
