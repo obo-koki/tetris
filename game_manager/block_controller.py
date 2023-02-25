@@ -10,7 +10,8 @@ from heapq import heapify, heappush, heappop, heappushpop, nlargest
 import copy
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
+#logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
 
 class Mode(Enum):
     NORMAL = 1
@@ -69,13 +70,9 @@ class Block_Controller(object):
         #self.show_board(GameStatus)
         #self.calcEvaluationValue(self.board_backboard_np, CurrentShapeClass, Mode.NORMAL)
 
-        t1 = time()
-        
-
         # Decide mode
         mode = self.decideMode(self.board_backboard_np)
 
-        t2 = time()
         top_strategy = []
         heapify(top_strategy)
 
@@ -99,8 +96,6 @@ class Block_Controller(object):
                     heappushpop(top_strategy, (EvalValue, count, strategy, board))
                 count += 1
         
-        t3 = time()
-
         if self.hold:
             #Hold shape search
             for direction0 in HoldShapeDirectionRange:
@@ -121,8 +116,6 @@ class Block_Controller(object):
                         heappushpop(top_strategy, (EvalValue, count, strategy, board))
                     count += 1
 
-        t4 = time()
-        
         for i in range(self.estimate_num):
             next_strategy = []
             heapify(next_strategy)
@@ -141,16 +134,12 @@ class Block_Controller(object):
                         count +=1
             top_strategy = copy.deepcopy(next_strategy)
 
-        t5 = time()
-        
         max_strategy = nlargest(1, top_strategy)
         strategy = max_strategy[0][2]
 
-        t6 = time()
-
         logging.debug('Mode: {}'.format(mode))
         logging.debug('Search time: {}'.format(time() - start_time))
-        logging.debug('t1:{},t2:{},t3:{},t4:{},t5:{},t6:{}'.format(t1-start_time,t2-t1,t3-t2,t4-t3,t5-t4, t6-t5))
+
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
