@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 from time import time
-import copy
 from enum import Enum
 import numpy as np
 import csv
@@ -30,22 +29,29 @@ class Block_Controller(object):
         self.beam_width = 10
         self.estimate_num = 5
         self.hold = False
-        self.xmin_max_list = [
-            [[0,0]], #Shape None
-            [[0,10],[2,9]], # Shape I
-            [[0,9],[1,9],[1,10],[1,9]], # Shape L
-            [[1,10],[1,9],[0,9],[1,9]], # Shape J
-            [[0,9],[1,9],[1,10],[1,9]], # Shape T
-            [[0,9]], # Shape O
-            [[1,9],[0,9]], # Shape S
-            [[1,9],[0,9]] # Shape Z
-        ]
+        self.xmin_max_tuple = (
+            ((0,0),), #Shape None
+            ((0,10),(2,9),), # Shape I
+            ((0,9),(1,9),(1,10),(1,9),), # Shape L
+            ((1,10),(1,9),(0,9),(1,9),), # Shape J
+            ((0,9),(1,9),(1,10),(1,9),), # Shape T
+            ((0,9),), # Shape O
+            ((1,9),(0,9),), # Shape S
+            ((1,9),(0,9),),# Shape Z
+        )
+        self.shape_coord = (
+            (((0, 0), (0, 0), (0, 0), (0, 0),),),
+            (((0, -1), (0, 0), (0, 1), (0, 2),), ((-2, 0), (-1, 0), (0, 0), (1, 0),),),
+            (((0, -1), (0, 0), (0, 1), (1, 1),),((-1, 0), (0, 0), (1, 0), (-1, 1),),((-1, -1), (0, -1), (0, 0), (0, 1),),((1, -1), (-1, 0), (0, 0), (1, 0),),),
+            (((0, -1), (0, 0), (0, 1), (-1, 1),),((-1, -1), (-1, 0), (0, 0), (1, 0),),((0, -1), (1, -1), (0, 0), (0, 1),),((-1, 0), (0, 0), (1, 0), (1, 1),),),
+            (((0, -1), (0, 0), (0, 1), (1, 0),),((0, 1), (-1, 0), (0, 0), (1, 0),),((0, -1), (-1, 0), (0, 0), (0, 1),),((0, -1), (-1, 0), (0, 0), (1, 0),),),
+            (((0, -1), (1, -1), (0, 0),(1, 0),),),
+            (((0, -1), (1, -1), (-1, 0), (0, 0),),((0, -1), (0, 0), (1, 0), (1, 1),),),
+            (((-1, -1), (0, -1), (0, 0), (1, 0),),((1, -1), (0, 0), (1, 0), (0, 1),),)
+        )
         self.board_width = 10
         self.board_height = 22
         self.ShapeNone_index = 0
-
-        self.df_num = 0
-
 
     # GetNextMove is main function.
     # input
@@ -55,7 +61,6 @@ class Block_Controller(object):
     # output
     #    nextMove : nextMove structure which includes next shape position and the other.
     def GetNextMove(self, nextMove, GameStatus):
-
 
         start_time = time()
 
@@ -83,76 +88,33 @@ class Block_Controller(object):
         #self.board_backboard_np = np.array(self.board_backboard).reshape(self.board_height, self.board_width)
 
         # Decide mode
-        mode = self.decideMode(self.board_backboard)
+        self.mode = self.decideMode(self.board_backboard)
 
-        top_strategy = []
-        heapify(top_strategy)
+        strategy_candidate = []
+        heapify(strategy_candidate)
 
-        # current shape search
-        count = 0
-        for direction0 in CurrentShapeDirectionRange:
-            # search with x range
-            x0Min, x0Max = self.xmin_max_list[CurrentShapeClass.shape][direction0]
-            logging.debug('CurrentShapeClass: {}, direction: {}, xmin: {}, xmax: {}'.format(CurrentShapeClass, direction0, x0Min, x0Max))
-            for x0 in range(x0Min, x0Max):
-                # get board data, as if dropdown block
-                board, dy= self.getDropDownBoard(self.board_backboard, CurrentShapeClass, direction0, x0)
-                #print("board_before", board)
-                # evaluate board
-                EvalValue = self.calcEvaluationValue(board, dy, CurrentShapeClass, mode)
-                #print("board_after", board)
-                # get board removed fulllines
-                #board, _ = self.removeFullLines(board, self.board_height, self.board_width)
-                strategy = (direction0, x0, 1, 1, 'n')
-                # update best move
-                if len(top_strategy) < self.beam_width:
-                    heappush(top_strategy, (EvalValue, count, strategy, board))
-                else:
-                    heappushpop(top_strategy, (EvalValue, count, strategy, board))
-                count += 1
+        #Curent shape search
+        self.beam_search(self.board_backboard, CurrentShapeClass, 
+                         CurrentShapeDirectionRange, strategy_candidate)
         
+        #Hold shape search
         if self.hold:
-            #Hold shape search
-            for direction0 in HoldShapeDirectionRange:
-                # search with x range
-                x0Min, x0Max = self.xmin_max_list[HoldShapeClass.shape][direction0]
-                for x0 in range(x0Min, x0Max):
-                    # get board data, as if dropdown block
-                    board, dy= self.getDropDownBoard(self.board_backboard, HoldShapeClass, direction0, x0)
-                    # evaluate board
-                    EvalValue = self.calcEvaluationValue(board, dy, HoldShapeClass, mode)
-                    # get board removed fulllines
-                    #board, _ = self.removeFullLines(board, self.board_height, self.board_width)
-                    strategy = (direction0, x0, 1, 1, 'y')
-                    # update best move
-                    if len(top_strategy) < self.beam_width:
-                        heappush(top_strategy, (EvalValue, count, strategy, board))
-                    else:
-                        heappushpop(top_strategy, (EvalValue, count, strategy, board))
-                    count += 1
+            self.beam_search(self.board_backboard, HoldShapeClass, 
+                             HoldShapeDirectionRange, strategy_candidate, hold=True)
 
-        for i in range(self.estimate_num):
-            next_strategy = []
-            heapify(next_strategy)
-            for lasteval,_, strategy, board in top_strategy:
-                for direction1 in ShapeListDirectionRange[i]:
-                    x1Min, x1Max = self.xmin_max_list[ShapeListClass[i].shape][direction1]
-                    for x1 in range(x1Min, x1Max):
-                        board2, dy = self.getDropDownBoard(board, ShapeListClass[i], direction1, x1)
-                        EvalValue = self.calcEvaluationValue(board2, dy, ShapeListClass[i], mode) + lasteval
-                        #board2, _ = self.removeFullLines(board2, self.board_height, self.board_width)
-                        # update best move
-                        if len(next_strategy) < self.beam_width:
-                            heappush(next_strategy, (EvalValue, count, strategy, board2))
-                        else:
-                            heappushpop(next_strategy, (EvalValue, count, strategy, board2))
-                        count +=1
-            top_strategy = pickle_copy(next_strategy)
+        #Next shape search
+        #for i in range(self.estimate_num):
+            #strategy_candidate_tmp = []
+            #heapify(strategy_candidate_tmp)
+            #for pre_eval,_, pre_strategy, pre_board in strategy_candidate:
+                #self.beam_search(pre_board, ShapeListClass[i], ShapeListDirectionRange[i], strategy_candidate_tmp,
+                                #pre_strategy=pre_strategy, pre_EvalValuse=pre_eval)
+            #strategy_candidate = pickle_copy(strategy_candidate_tmp)
 
-        max_strategy = nlargest(1, top_strategy)
+        max_strategy = nlargest(1, strategy_candidate)
         strategy = max_strategy[0][2]
 
-        logging.debug('Mode: {}'.format(mode))
+        logging.debug('Mode: {}'.format(self.mode))
         logging.debug('Search time: {}'.format(time() - start_time))
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
@@ -165,6 +127,35 @@ class Block_Controller(object):
             self.hold = True
 
         return nextMove
+
+    def beam_search(self, board, ShapeClass, DirectionRange, strategy_candidate, 
+        hold = False, pre_strategy = None, pre_EvalValuse = None):
+        id = 0
+        shape_xmin_max = self.xmin_max_tuple[ShapeClass.shape]
+        for direction in DirectionRange:
+            # search with x range
+            xMin, xMax = shape_xmin_max[direction]
+            for x in range(xMin, xMax):
+                # get board data, as if dropdown block
+                dropdown_board, dy= self.getDropDownBoard(board, ShapeClass, direction, x)
+                # evaluate board
+                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board, ShapeClass, self.mode) #-> board kawatta?
+                if not pre_EvalValuse == None:
+                    EvalValue += pre_EvalValuse
+                # make strategy
+                if not pre_strategy == None:
+                    strategy = pre_strategy
+                else:
+                    if hold:
+                        strategy = (direction, x, 1, 1, 'y')
+                    else:
+                        strategy = (direction, x, 1, 1, 'n')
+                # update candidate
+                if len(strategy_candidate) < self.beam_width:
+                    heappush(strategy_candidate, (EvalValue, id, strategy, dropdown_board))
+                else:
+                    heappushpop(strategy_candidate, (EvalValue, id, strategy, dropdown_board))
+                id += 1
 
     def get_individual(self, csv_file = "individual.csv"):
         with open(csv_file, 'r') as csv_file:
@@ -190,8 +181,9 @@ class Block_Controller(object):
         #
         # get coordinate array by given shape.
         #
-        coordArray = Shape_class.getCoords(direction, x, y) # get array from shape direction, x, y.
-        return coordArray
+        #coordArray = Shape_class.getCoords(direction, x, y) # get array from shape direction, x, y.
+        #return coordArray
+        return ((x + xx, y + yy) for xx, yy in self.shape_coord[Shape_class.shape][direction])
 
     def getDropDownBoard(self, board_backboard, Shape_class, direction, x):
         # 
@@ -269,7 +261,7 @@ class Block_Controller(object):
         #print("mode:", mode)
         return mode
 
-    def calcEvaluationValue(self, board, dy, ShapeListClass, mode = Mode.ATTACK):
+    def calcEvaluationValue(self, board, ShapeListClass, mode = Mode.ATTACK):
         # calc Evaluation Value
 
         #before remove full lines
@@ -290,7 +282,7 @@ class Block_Controller(object):
         wells = self.get_wells(board, peaks)
         maxWell = max(wells)
         total_none_cols = self.get_total_none_cols(board)
-        dy_right = peaks[-2] - peaks[-1]
+        #dy_right = peaks[-2] - peaks[-1]
 
         #20220806
         #eval_list = np.array([fullLines, nPeaks, maxY, maxY_right, nHoles, total_col_with_hole,
@@ -334,7 +326,7 @@ class Block_Controller(object):
             #score -= 1000 * maxY_right
 
         #print ("score", score)
-        return score
+        return score, board
     
     def get_peaks(self, board, height, width):
         peaks = [0] * width
@@ -374,7 +366,8 @@ class Block_Controller(object):
     def get_total_cols_with_hole(self, board, holes = None):
         if holes is None:
             holes = self.get_holes(board)
-        return sum([1 if holes[x]>0 else 0 for x in range(self.board_width)])
+        #return sum([1 if holes[x]>0 else 0 for x in range(self.board_width)])
+        return sum([1 if holes[x] else 0 for x in range(self.board_width)])
     
     def get_x_transitions(self, board, maxY = None):
         if maxY is None:
@@ -432,5 +425,34 @@ class Block_Controller(object):
     
     def get_total_none_cols(self, board):
         return np.count_nonzero(np.count_nonzero(board, axis=0) == 0)
+    
+    def show_board(self, board):
+        for y in range(self.board_height):
+            tmpstr=''
+            for x in range(self.board_width):
+                tmpstr = tmpstr + str(board[y*self.board_width+x]) + ' '
+            print(format(x,'02d'),tmpstr)
+        print('-- 0 1 2 3 4 5 6 7 8 9 --' )
 
 BLOCK_CONTROLLER = Block_Controller()
+
+## Test
+if __name__ == '__main__':
+    import yaml
+    config_file = "test_config/board_data.yaml"
+
+    with open(config_file, "r") as yml:
+        config = yaml.safe_load(yml)
+        backboard = list()
+        for board in config["backboard"]:
+            backboard.extend(board)
+
+    from board_manager import Shape   
+    shapeclass = Shape(1)
+
+    block_controller = Block_Controller()
+
+    block_controller.show_board(backboard)
+    _, backboard = block_controller.calcEvaluationValue(backboard, shapeclass)
+    block_controller.show_board(backboard)
+
