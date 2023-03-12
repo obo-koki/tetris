@@ -33,7 +33,7 @@ def make_graph(list1, list2):
 
 def make_ind_csv(individual, file_name = 'individual.csv'):
     global row_name, param_name, param_list
-    with open(file_name, 'w') as csv_file:
+    with open(file_name, 'w', newline="") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(ROW_NAME)
         writer.writerow(individual)
@@ -41,7 +41,7 @@ def make_ind_csv(individual, file_name = 'individual.csv'):
         writer.writerow(param_list)
 
 def execute_tetris_game(random_seed):
-    cmd = 'python3' + ' ' + 'start_gen.py' \
+    cmd = 'python' + ' ' + 'start_for_gen.py' \
         + ' ' + '--game_level' + ' ' + str(GAME_LEVEL) \
         + ' ' + '--game_time' + ' ' + str(GAME_TIME) \
         + ' ' + '--drop_interval' + ' ' + str(DROP_INTERVAL)\

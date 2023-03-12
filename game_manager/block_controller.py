@@ -8,6 +8,7 @@ import os
 from heapq import heapify, heappush, heappushpop, nlargest
 import logging
 import pickle
+import copy
 
 #logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
 logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
@@ -24,8 +25,9 @@ class Block_Controller(object):
 
     def __init__(self):
         # init parameter
-        self.individual = self.get_individual(csv_file = 
+        self.ind = self.get_individual(csv_file = 
             os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
+        logging.debug('self.ind:{}'.format(self.ind))
         self.beam_width = 10
         self.estimate_num = 5
         self.hold = False
@@ -160,13 +162,12 @@ class Block_Controller(object):
     def get_individual(self, csv_file = "individual.csv"):
         with open(csv_file, 'r') as csv_file:
             reader = csv.reader(csv_file)
-            ind_list = []
+            individual = list()
             for row in reader:
                 if reader.line_num == 2:
-                    for col in row:
-                        ind_list.append(float(col))
+                    individual = [float(col) for col in row]
                     break
-            return np.array(ind_list)
+            return individual
 
     def getSearchXRange(self, Shape_class, direction):
         #
@@ -197,7 +198,8 @@ class Block_Controller(object):
         #board_backboard_np = np.array(board_backboard) 
         #board = board_backboard_np.tolist() -> faster than list deepcopy
 
-        board = pickle_copy(board_backboard) # -> fastest
+        #board = pickle_copy(board_backboard) # -> fastest
+        board = copy.copy(board_backboard)
         _board, dy = self.dropDown(board, Shape_class, direction, x)
         return _board, dy
     
@@ -293,8 +295,8 @@ class Block_Controller(object):
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
 
         #20220810-2
-        #if fullLines < 3:
-            #fullLines = 0
+        if fullLines < 3:
+            fullLines = 0
         #eval_list = np.array([fullLines, nPeaks, maxY, nHoles,
             #x_transitions, y_transitions, total_dy, maxWell,total_col_with_hole, total_none_cols])
 
@@ -306,12 +308,14 @@ class Block_Controller(object):
         #logging.debug('nPeaks: {}, nHoles: {}, total_col_with_hole: {}, total_dy: {}, x_transitions: {}, y_transitions: {}, total_none_cols: {}, maxWell: {}, fullLines: {} '
                     #.format(nPeaks, nHoles, total_col_with_hole, total_dy,
                     #x_transitions, y_transitions, total_none_cols, maxWell, fullLines))
-        eval_list = np.array([nPeaks, nHoles, total_col_with_hole, total_dy,
-            x_transitions, y_transitions, total_none_cols, maxWell, fullLines])
+        #eval_list = np.array([nPeaks, nHoles, total_col_with_hole, total_dy,
+            #x_transitions, y_transitions, total_none_cols, maxWell, fullLines])
+        eval_list = [nPeaks, nHoles, total_col_with_hole, total_dy, x_transitions, y_transitions, total_none_cols, maxWell, fullLines]
         
         #print("individual", self.individual)
         #print("eval_list", eval_list)
-        score = np.dot(self.individual, np.transpose(eval_list))
+        #score = np.dot(self.individual, np.transpose(eval_list))
+        score = sum([x * y for (x,y) in zip(self.ind, eval_list)])
         #if not ShapeListClass.shape == 1:
             #if mode == Mode.NORMAL and fullLines < 3:
                 #score += 1000 * dy_right
@@ -455,4 +459,3 @@ if __name__ == '__main__':
     block_controller.show_board(backboard)
     _, backboard = block_controller.calcEvaluationValue(backboard, shapeclass)
     block_controller.show_board(backboard)
-
