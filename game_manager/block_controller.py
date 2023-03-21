@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-from time import time
 from enum import Enum
 import csv
 import os
@@ -15,6 +14,16 @@ class Mode(Enum):
     NORMAL = 1
     ATTACK = 2
     DEFENCE = 3
+
+#class Board_Data:
+    #def __init__(self, board, height, width):
+        #self.board : list[int] = board
+        #self.height = height
+        #self.width = width
+        #self.peaks : list[int]
+        #self.maxY : int 
+    
+    #def get_peaks(self):
 
 class Block_Controller(object):
 
@@ -55,6 +64,16 @@ class Block_Controller(object):
             (((0, 0),(1, 0),),),
             (((1, -1), (-1, 0), (0, 0),),((0, 0), (1, 1),),),
             (((-1, -1), (0, 0), (1, 0),),((1, 0), (0, 1),),)
+        )
+        self.shape_height = (
+            (0,),
+            (1,0,),
+            (1,0,1,1,),
+            (1,1,1,0,),
+            (1,0,1,1,),
+            (1,),
+            (1,1,),
+            (1,1,)
         )
 
         self.board_width = 10
@@ -194,23 +213,6 @@ class Block_Controller(object):
         board = copy(board_backboard)
         board, dy = self.dropDown(board, Shape_class, direction, x)
         return board, dy
-    
-    def removeFullLines(self, board, height, width):
-        newBoard = [0] * width * height
-        newY = height - 1
-        fullLines = 0
-        for y in range(height - 1, -1, -1):
-            blockCount = sum([1 if board[y*width + x] > 0 else 0 for x in range(width)])
-            if blockCount == width:
-                fullLines += 1
-            elif blockCount == 0:
-                pass
-            else:
-                #for x in range(width):
-                    #newBoard[newY * width + x] = board[y * width + x]
-                newBoard[newY * width : (newY + 1) * width] = board[y * width : (y + 1) * width]
-                newY -= 1
-        return newBoard, fullLines
 
     def dropDown(self, board, Shape_class, direction, x):
         # 
@@ -237,18 +239,38 @@ class Block_Controller(object):
         #
         # internal function of dropDown.
         #
-        coordArray = self.getShapeCoordArray(Shape_class, direction, x, 0)
+        coordArray = self.getShapeCoordArray(Shape_class, direction, x, dy)
         for _x, _y in coordArray:
-            board[(_y + dy)*self.board_width + _x] = Shape_class.shape
+            board[_y*self.board_width + _x] = Shape_class.shape
         return board
+    
+    def removeFullLines(self, board, height, width, maxY):
+        newBoard = [0] * width * height
+        newY = height - 1
+        fullLines = 0
+        for y in range(height - 1, height - maxY -1, -1):
+            blockCount = sum([1 if board[y*width + x] > 0 else 0 for x in range(width)])
+            if blockCount == width:
+                fullLines += 1
+            elif blockCount == 0:
+                pass
+            else:
+                #for x in range(width):
+                    #newBoard[newY * width + x] = board[y * width + x]
+                newBoard[newY * width : (newY + 1) * width] = board[y * width : (y + 1) * width]
+                newY -= 1
+        return newBoard, fullLines
     
     def decideMode(self, board):
         mode = Mode.DEFENCE
-        peaks = self.get_peaks(board, self.board_width, self.board_height)
+        width = self.board_width
+        height = self.board_height
+
+        peaks = self.get_peaks(board, height, width)
         maxY = max(peaks)
         holes = self.get_holes(board, peaks)
         n_holes = sum(holes)
-        wells = self.get_wells(board, peaks)
+        wells = self.get_wells(width, peaks)
         wells_sorted = sorted(wells)
         second_well = wells_sorted[-2]
         if second_well < 5 and maxY < 15 and n_holes < 4:
@@ -261,24 +283,29 @@ class Block_Controller(object):
     def calcEvaluationValue(self, board, ShapeListClass, mode = Mode.ATTACK):
         # calc Evaluation Value
 
+        width = self.board_width
+        height = self.board_height
         #before remove full lines
-        peaks_before = self.get_peaks(board, self.board_height, self.board_width)
+        peaks_before = self.get_peaks(board, height, width)
         maxY_right = peaks_before[-1]
+        maxY = max(peaks_before)
 
         #after remove full lines
-        board, fullLines = self.removeFullLines(board, self.board_height, self.board_width)
-        peaks = self.get_peaks(board, self.board_height, self.board_width)
+        board, fullLines = self.removeFullLines(board, height, width, maxY)
+        peaks_tmp = [peak - fullLines for peak in peaks_before]
+        #peaks = self.get_peaks(board, height, width, maxY)
+        peaks = self.get_peaks_tmp(board, height, width, peaks_tmp)
         nPeaks = sum(peaks)
         maxY = max(peaks)
         holes = self.get_holes(board, peaks)
         nHoles = sum(holes)
-        total_col_with_hole = self.get_total_cols_with_hole(board, holes)
+        total_col_with_hole = self.get_total_cols_with_hole(width, holes)
         x_transitions = self.get_x_transitions(board, maxY)
         y_transitions = self.get_y_transitions(board, peaks)
-        total_dy = self.get_total_dy(board, peaks)
-        wells = self.get_wells(board, peaks)
+        total_dy = self.get_total_dy(width, peaks)
+        wells = self.get_wells(width, peaks)
         maxWell = max(wells)
-        total_none_cols = self.get_total_none_cols(board, peaks)
+        total_none_cols = self.get_total_none_cols(width, peaks)
         #dy_right = peaks[-2] - peaks[-1]
 
         #20220810-2
@@ -301,18 +328,29 @@ class Block_Controller(object):
 
         return score, board
     
-    def get_peaks(self, board, height, width):
+    def get_peaks(self, board, height, width, maxY=None):
+        if not maxY == None:
+            start_height = maxY
+        else:
+            start_height = height - 1
         peaks = [0] * width
         for x in range(width):
-            for y in range(height-1, 0, -1):
+            for y in range(start_height, 0, -1):
                 if board[(height - y) * width + x] != 0:
                     peaks[x] = y
                     break
         return peaks
 
-    def get_holes(self, board, peaks = None):
-        if peaks is None:
-            peaks = self.get_peaks(board)
+    def get_peaks_tmp(self, board, height, width, peaks_before = None):
+        peaks = [0] * width
+        for x in range(width):
+            for y in range(peaks_before[x], 0, -1):
+                if board[(height - y) * width + x] != 0:
+                    peaks[x] = y
+                    break
+        return peaks
+
+    def get_holes(self, board, peaks):
         holes= []
         for x in range(self.board_width):
             start_y = peaks[x] - 1
@@ -326,14 +364,10 @@ class Block_Controller(object):
                 holes.append(hole)
         return holes
     
-    def get_total_cols_with_hole(self, board, holes = None):
-        if holes is None:
-            holes = self.get_holes(board)
-        return sum([1 if holes[x] else 0 for x in range(self.board_width)])
+    def get_total_cols_with_hole(self, width, holes):
+        return sum([1 if holes[x] else 0 for x in range(width)])
     
-    def get_x_transitions(self, board, maxY = None):
-        if maxY is None:
-            maxY = self.get_maxY(board)
+    def get_x_transitions(self, board, maxY):
         height = self.board_height
         width = self.board_width
         transitions = 0
@@ -343,9 +377,7 @@ class Block_Controller(object):
                     transitions += 1
         return transitions
     
-    def get_y_transitions(self, board, peaks = None):
-        if peaks is None:
-            peaks = self.get_peaks(board)
+    def get_y_transitions(self, board, peaks):
         height = self.board_height
         width = self.board_width
         transitions = 0
@@ -355,19 +387,15 @@ class Block_Controller(object):
                     transitions += 1
         return transitions
     
-    def get_total_dy(self, board, peaks = None):
-        if peaks is None:
-            peaks = self.get_peaks(board)
+    def get_total_dy(self, width, peaks):
         total_dy = 0
-        for x in range(len(peaks)-1):
+        for x in range(width-1):
             total_dy += abs(peaks[x+1] - peaks[x])
         return total_dy
     
-    def get_wells(self, board, peaks = None):
-        if peaks is None:
-            peaks = self.get_peaks(board)
+    def get_wells(self, width, peaks):
         wells = []
-        for x in range(len(peaks)):
+        for x in range(width):
             if x == 0:
                 well = peaks[1] - peaks[0]
                 well = well if well > 0 else 0
@@ -385,10 +413,9 @@ class Block_Controller(object):
                 wells.append(well)
         return wells
     
-    def get_total_none_cols(self, board, peaks = None):
-        if peaks is None:
-            peaks = self.get_peaks(board)
-        return sum([1 if peaks[x] else 0 for x in range(self.board_width)])
+    def get_total_none_cols(self, width, peaks):
+        #return sum([1 if peaks[x] else 0 for x in range(self.board_width)])
+        return sum([1 if peaks[x] else 0 for x in range(width)])
     
     def show_board(self, board):
         for y in range(self.board_height):
