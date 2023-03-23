@@ -189,8 +189,8 @@ class Block_Controller(object):
         for direction in DirectionRange:
             # search with x range
             xMin, xMax = shape_xmin_max[direction]
-            #if self.mode == Mode.NORMAL and Shape == 2:
-                #xMax -= 1
+            if self.mode == Mode.NORMAL and Shape == 2:
+                xMax -= 1
             for x in range(xMin, xMax):
                 # get board data, as if dropdown block
                 dropdown_board, dy= self.getDropDownBoard(board, Shape, direction, x)
