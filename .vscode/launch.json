@@ -21,10 +21,10 @@
             "program": "C:/Users/koki/Desktop/tetris/game_manager/game_manager.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args":["--game_time", "180", "--seed", "0", "--obstacle_height", "0","--obstacle_probability", "0", 
+            "args":["--game_time", "180", "--seed", "0", "--obstacle_height", "10","--obstacle_probability", "40", 
                     "--drop_interval","1000", "--mode", "default", "--user_name", "window_sample", "--resultlogjson","result.json",
                     "--train_yaml", "config/default.yaml", "--predict_weight", "outputs/latest/best_weight.pt", "--ShapeListMax", "6",
-                    "--BlockNumMax", "-1", "--art_config_filepath", "default.json"
+                    "--BlockNumMax", "180", "--art_config_filepath", "default.json"
                 ],
             "subProcess": true
         }
