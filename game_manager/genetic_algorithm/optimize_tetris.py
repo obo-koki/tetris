@@ -14,6 +14,7 @@ import pickle
 GAME_CNT = 0
 GEN = 0
 SEED = 0
+gen = 0
 
 ROW_NAME = ["nPeaks", "nHoles", "total_col_with_hole", "total_dy",
             "x_transitions", "y_transitions", "total_none_cols", "maxWell", "fullLines"]
@@ -58,11 +59,15 @@ def get_result():
     return result['judge_info']['score']
     
 def eval_ind(individual):
-    global GAME_CNT, GEN, SEED
+    global GAME_CNT, GEN, SEED, gen
     make_ind_csv(individual)
-    execute_tetris_game(SEED)
+    execute_tetris_game(gen)
+    result = get_result()
+    execute_tetris_game(NGEN-gen)
+    result += get_result()
     GAME_CNT += 1
-    return get_result(),
+    print("GAME_CNT: ",GAME_CNT)
+    return result,
 
 if __name__ == '__main__':
     args = sys.argv

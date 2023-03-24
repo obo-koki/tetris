@@ -3,12 +3,7 @@
 from enum import Enum
 import csv
 import os
-#from heapq import heapify, heappush, heappushpop, nlargest
-#import logging
 from copy import copy
-
-#logging.basicConfig(level=logging.DEBUG, format='%(levelname)s %(asctime)s: %(message)s')
-#logging.basicConfig(level=logging.WARNING, format='%(levelname)s %(asctime)s: %(message)s')
 
 class Mode(Enum):
     NORMAL = 1
@@ -100,27 +95,6 @@ class Block_Controller(object):
         # current shape info
         CurrentShapeClass = GameStatus["block_info"]["currentShape"]["class"]
         CurrentShapeDirectionRange = GameStatus["block_info"]["currentShape"]["direction_range"]
-        # next shape info
-        #nextShapeList = GameStatus["block_info"]["nextShapeList"]
-        #ShapeListDirectionRange = [
-            #nextShapeList["element1"]["direction_range"],
-            #nextShapeList["element2"]["direction_range"],
-            #nextShapeList["element3"]["direction_range"],
-            #nextShapeList["element4"]["direction_range"],
-            #nextShapeList["element5"]["direction_range"]
-        #]
-        #ShapeListClass = [
-            #nextShapeList["element1"]["class"],
-            #nextShapeList["element2"]["class"],
-            #nextShapeList["element3"]["class"],
-            #nextShapeList["element4"]["class"],
-            #nextShapeList["element5"]["class"]
-        #]
-        #for i in range(1,6):
-            #ElementNo = "element" + str(i)
-            #ShapeListClass.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["class"])
-            #ShapeListDirectionRange.append(GameStatus["block_info"]["nextShapeList"][ElementNo]["direction_range"])
-            ##logging.debug('ShapeListClass {}:{}'.format(ElementNo, GameStatus["block_info"]["nextShapeList"][ElementNo]["class"].shape))
         ## hold shape info
         HoldShapeClass = GameStatus["block_info"]["holdShape"]["class"]
         HoldShapeDirectionRange = GameStatus["block_info"]["holdShape"]["direction_range"]
@@ -141,36 +115,18 @@ class Block_Controller(object):
 
         
         strategy_candidate = [] # [evalvalue, strategy, board]
-        #heapify(strategy_candidate)
 
         #Search current shape
-        #self.beamSearch(self.board_backboard, CurrentShapeClass, 
-                         #CurrentShapeDirectionRange, strategy_candidate)
         strategy_candidate = self.simpleSearch(self.board_backboard, CurrentShapeClass.shape, 
                          CurrentShapeDirectionRange, strategy_candidate)
         
         #Search hold shape
-        #if self.hold:
-            #self.beamSearch(self.board_backboard, HoldShapeClass, 
-                             #HoldShapeDirectionRange, strategy_candidate, hold=True)
         if self.hold:
             strategy_candidate = self.simpleSearch(self.board_backboard, HoldShapeClass.shape, 
                              HoldShapeDirectionRange, strategy_candidate, hold=True)
 
-        #Search next shape
-        #for i in range(self.estimate_num):
-            #strategy_candidate_tmp = []
-            #heapify(strategy_candidate_tmp)
-            #for pre_eval,_, pre_strategy, pre_board in strategy_candidate:
-                #self.beamSearch(pre_board, ShapeListClass[i], ShapeListDirectionRange[i], strategy_candidate_tmp,
-                                #pre_strategy=pre_strategy, pre_EvalValuse=pre_eval)
-            #strategy_candidate = pickle_copy(strategy_candidate_tmp)
-
-        #max_strategy = nlargest(1, strategy_candidate)
-        #strategy = max_strategy[0][2]
-
+        #Make next move
         strategy = strategy_candidate[1]
-
         nextMove["strategy"]["direction"] = strategy[0]
         nextMove["strategy"]["x"] = strategy[1]
         nextMove["strategy"]["y_operation"] = strategy[2]
@@ -205,35 +161,6 @@ class Block_Controller(object):
                 if len(strategy_candidate) == 0 or EvalValue >= strategy_candidate[0]:
                     strategy_candidate = [EvalValue, strategy, dropdown_board]
         return strategy_candidate
-
-    #def beamSearch(self, board, ShapeClass, DirectionRange, strategy_candidate, 
-        #hold = False, pre_strategy = None, pre_EvalValuse = None):
-        #id = 0
-        #shape_xmin_max = self.xmin_max_tuple[ShapeClass.shape]
-        #for direction in DirectionRange:
-            ## search with x range
-            #xMin, xMax = shape_xmin_max[direction]
-            #for x in range(xMin, xMax):
-                ## get board data, as if dropdown block
-                #dropdown_board, dy= self.getDropDownBoard(board, ShapeClass, direction, x)
-                ## evaluate board
-                #EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board, ShapeClass, self.mode)
-                #if not pre_EvalValuse == None:
-                    #EvalValue += pre_EvalValuse
-                ## make strategy
-                #if not pre_strategy == None:
-                    #strategy = pre_strategy
-                #else:
-                    #if hold:
-                        #strategy = (direction, x, 1, 1, 'y')
-                    #else:
-                        #strategy = (direction, x, 1, 1, 'n')
-                ## update candidate
-                #if len(strategy_candidate) < self.beam_width:
-                    #heappush(strategy_candidate, (EvalValue, id, strategy, dropdown_board))
-                #else:
-                    #heappushpop(strategy_candidate, (EvalValue, id, strategy, dropdown_board))
-                #id += 1
 
     def getIndividual(self, csv_file = "individual.csv"):
         with open(csv_file, 'r') as csv_file:
@@ -309,7 +236,7 @@ class Block_Controller(object):
         n_holes = sum(board[self.holes_sl])
         wells_sorted = sorted(board[self.wells_sl])
         second_well = wells_sorted[-2]
-        if second_well < 5 and maxY < 15 and n_holes < 4:
+        if second_well < 5 and maxY < 13 and n_holes < 4:
             mode = Mode.NORMAL
         #if second_well < 5 and maxY < 12 and n_holes < 4:
             #mode = Mode.ATTACK
@@ -321,14 +248,12 @@ class Block_Controller(object):
         width = self.board_width
         height = self.board_height
         #before remove full lines
-        #peaks_before = self.get_peaks(board, height, width)
         maxY_right = board[self.peaks_sl][-1]
         maxY = max(board[self.peaks_sl])
 
         #after remove full lines
         board[self.board_sl], fullLines = self.removeFullLines(board[self.board_sl], height, width, maxY)
         peaks_tmp = [peak - fullLines for peak in board[self.peaks_sl]]
-        #peaks = self.get_peaks(board, height, width, maxY)
         board[self.peaks_sl] = self.get_peaks_from_before(board[self.board_sl], height, width, peaks_tmp)
         board[self.holes_sl] = self.get_holes(board[self.board_sl], board[self.peaks_sl])
         board[self.wells_sl] = self.get_wells(width, board[self.peaks_sl])
