@@ -157,7 +157,7 @@ class Block_Controller(object):
             nextMove["strategy"]["use_hold_function"] = "y"
             self.hold = True
 
-        print("operate_time:", time() - start)
+        #print("operate_time:", time() - start)
 
         return nextMove
 
