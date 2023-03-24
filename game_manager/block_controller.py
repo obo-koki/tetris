@@ -372,11 +372,8 @@ class Block_Controller(object):
                 newY -= 1
         return newBoard, fullLines
     
-    def get_peaks(self, board, height, width, maxY=None):
-        if not maxY == None:
-            start_height = maxY
-        else:
-            start_height = height - 1
+    def get_peaks(self, board, height, width):
+        start_height = height - 1
         peaks = [0] * width
         for x in range(width):
             for y in range(start_height, 0, -1):
