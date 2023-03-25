@@ -89,10 +89,12 @@ class Block_Controller(object):
             (1,1,),
             (1,1,)
         )
+        self.xMax_allow_ind = set([0, 4, 10, 12]) # (shape -1) * 4 + range
 
     # GetNextMove is main function.
     def GetNextMove(self, nextMove, GameStatus):
         start = time()
+
         ## Get data from GameStatus
         # current shape info
         CurrentShapeClass = GameStatus["block_info"]["currentShape"]["class"]
@@ -168,8 +170,16 @@ class Block_Controller(object):
         for direction in DirectionRange:
             # search with x range
             xMin, xMax = shape_xmin_max[direction]
-            if self.mode == Mode.NORMAL and Shape == 2:
-                xMax -=1
+            ind = (Shape - 1) * 4 + direction
+            if self.mode == Mode.NORMAL:
+                if not ind in self.xMax_allow_ind:
+                    xMax -= 1
+                elif ind == 0:
+                    peaks = board[self.peaks_sl]
+                    right_end_Y = peaks[-1]
+                    left_min_Y = min(peaks[:-1])
+                    if left_min_Y - right_end_Y < 4:
+                        xMax -= 1
             for x in range(xMin, xMax):
                 # get board data, as if dropdown block
                 dropdown_board, dy= self.getDropDownBoard(board, Shape, direction, x)
@@ -277,7 +287,7 @@ class Block_Controller(object):
         height = self.board_height
         #before remove full lines
         #peaks_before = self.get_peaks(board, height, width)
-        maxY_right = board[self.peaks_sl][-1]
+        #maxY_right = board[self.peaks_sl][-1]
         maxY = max(board[self.peaks_sl])
 
         #after remove full lines
@@ -306,8 +316,8 @@ class Block_Controller(object):
         eval_list = [nPeaks, nHoles, total_col_with_hole, total_dy, x_transitions, y_transitions, total_none_cols, maxWell, fullLines]
         score = sum([x * y for (x,y) in zip(self.ind, eval_list)])
 
-        if mode == Mode.NORMAL and fullLines < 3:
-            score -= 1000 * maxY_right
+        #if mode == Mode.NORMAL and fullLines < 3:
+            #score -= 1000 * maxY_right
         
         if fullLines == 4:
             score += 10000
