@@ -16,8 +16,10 @@ class Block_Controller(object):
 
     def __init__(self):
         #init param
-        self.ind = self.getIndividual(csv_file = 
-            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
+        self.ind_normal = self.getIndividual(csv_file = 
+            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual_normal.csv")
+        self.ind = self.ind_defence = self.getIndividual(csv_file = 
+            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual_defence.csv")
         self.board_width = 10
         self.board_height = 22
         self.ShapeNone_index = 0
@@ -110,11 +112,13 @@ class Block_Controller(object):
         if not self.gameover_count == gameover_count:
             self.board_initialized = False
             self.peaks_initialized = False
+            self.gameover_count = gameover_count
 
         # current board info
         if not self.board_initialized:
             self.board_backboard[self.board_sl] = GameStatus["field_info"]["backboard"]
             self.board_initialized = True
+            #print("board_initialized")
 
         # Decide mode
         self.mode = self.decideMode(self.board_backboard)
@@ -147,23 +151,28 @@ class Block_Controller(object):
 
     def decideMode(self, board):
         mode = Mode.DEFENCE
+        self.ind = self.ind_defence
         width = self.board_width
         height = self.board_height
 
-        board[self.peaks_sl] = \
-            self.get_peaks(board[self.board_sl], height, width)
-        board[self.holes_sl] = \
-            self.get_holes(board[self.board_sl], board[self.peaks_sl])
-        board[self.wells_sl] = \
-            self.get_wells(width, board[self.peaks_sl])
+        if not self.peaks_initialized:
+            board[self.peaks_sl] = \
+                self.get_peaks(board[self.board_sl], height, width)
+            board[self.holes_sl] = \
+                self.get_holes(board[self.board_sl], board[self.peaks_sl])
+            board[self.wells_sl] = \
+                self.get_wells(width, board[self.peaks_sl])
+            self.peaks_initialized = True
 
-        maxY = max(board[self.peaks_sl])
+        peaks = board[self.peaks_sl]
+        maxY = max(peaks)
         n_holes = sum(board[self.holes_sl])
         wells = board[self.wells_sl]
         wells_sorted = sorted(wells)
         second_well = wells_sorted[-2]
         if second_well < 5 and maxY < 15 and n_holes < 4:
-            if wells[0] > 2 and wells[0] > wells[-1]:
+            self.ind = self.ind_normal
+            if peaks[0] < peaks[-1]:
                 mode = Mode.ATTACK_LEFT
                 if wells[1] > 2:
                     mode = Mode.NORMAL_LEFT
@@ -171,8 +180,6 @@ class Block_Controller(object):
                 mode = Mode.ATTACK_RIGHT
                 if wells[-2] > 2:
                     mode = Mode.NORMAL_RIGHT
-        #if second_well < 5 and maxY < 12 and n_holes < 4:
-            #mode = Mode.ATTACK
         return mode
 
     def simpleSearch(self, board, Shape, DirectionRange, strategy_candidate, hold = False):
