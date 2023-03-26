@@ -187,7 +187,7 @@ class Block_Controller(object):
         wells_sorted = sorted(wells)
         second_well = wells_sorted[-2]
         if second_well < 5 and maxY < 15 and n_holes < 4:
-            if wells[0] > 1 and wells[0] > wells[-1]:
+            if wells[0] > 2 and wells[0] > wells[-1]:
                 mode = Mode.ATTACK_LEFT
                 if wells[1] > 2:
                     mode = Mode.NORMAL_LEFT
