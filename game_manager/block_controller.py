@@ -6,9 +6,11 @@ import os
 from copy import copy
 
 class Mode(Enum):
-    NORMAL_RIGHT = 1
-    NORMAL_LEFT = 2
-    DEFENCE = 3
+    ATTACK_RIGHT = 1
+    ATTACK_LEFT = 2
+    NORMAL_RIGHT = 3
+    NORMAL_LEFT = 4
+    DEFENCE = 5
     
 class Block_Controller(object):
 
@@ -88,7 +90,10 @@ class Block_Controller(object):
             (1,1,),
             (1,1,)
         )
-        self.xMax_allow_ind = set([0]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_ATTACK_RIGHT = set([0]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_ATTACK_LEFT = set([0]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_NORMAL_RIGHT = set([0, 4, 10]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_NORMAL_LEFT = set([0, 6, 8]) # (shape -1) * 4 + range
 
     # GetNextMove is main function.
     def GetNextMove(self, nextMove, GameStatus):
@@ -140,14 +145,47 @@ class Block_Controller(object):
 
         return nextMove
 
+    def decideMode(self, board):
+        mode = Mode.DEFENCE
+        width = self.board_width
+        height = self.board_height
+
+        board[self.peaks_sl] = \
+            self.get_peaks(board[self.board_sl], height, width)
+        board[self.holes_sl] = \
+            self.get_holes(board[self.board_sl], board[self.peaks_sl])
+        board[self.wells_sl] = \
+            self.get_wells(width, board[self.peaks_sl])
+
+        maxY = max(board[self.peaks_sl])
+        n_holes = sum(board[self.holes_sl])
+        wells = board[self.wells_sl]
+        wells_sorted = sorted(wells)
+        second_well = wells_sorted[-2]
+        if second_well < 5 and maxY < 15 and n_holes < 4:
+            if wells[0] > 2 and wells[0] > wells[-1]:
+                mode = Mode.ATTACK_LEFT
+                if wells[1] > 2:
+                    mode = Mode.NORMAL_LEFT
+            else:
+                mode = Mode.ATTACK_RIGHT
+                if wells[-2] > 2:
+                    mode = Mode.NORMAL_RIGHT
+        #if second_well < 5 and maxY < 12 and n_holes < 4:
+            #mode = Mode.ATTACK
+        return mode
+
     def simpleSearch(self, board, Shape, DirectionRange, strategy_candidate, hold = False):
         shape_xmin_max = self.xmin_max_tuple[Shape]
         for direction in DirectionRange:
             # search with x range
             xMin, xMax = shape_xmin_max[direction]
             ind = (Shape - 1) * 4 + direction
-            if self.mode == Mode.NORMAL_RIGHT:
-                if not ind in self.xMax_allow_ind:
+            if self.mode == Mode.NORMAL_RIGHT or self.mode == Mode.ATTACK_RIGHT:
+                xMax_allow_ind = self.xMinMax_allow_ind_ATTACK_RIGHT
+                if self.mode == Mode.NORMAL_RIGHT:
+                    xMax_allow_ind = self.xMinMax_allow_ind_NORMAL_RIGHT
+                if not ind in xMax_allow_ind:
                     xMax -= 1
                 elif ind == 0:
                     peaks = board[self.peaks_sl]
@@ -155,15 +193,20 @@ class Block_Controller(object):
                     left_min_Y = min(peaks[:-1])
                     if left_min_Y - right_end_Y < 4:
                         xMax -= 1
-            elif self.mode == Mode.NORMAL_LEFT:
-                if not ind in self.xMax_allow_ind:
+
+            elif self.mode == Mode.NORMAL_LEFT or self.mode == Mode.ATTACK_LEFT:
+                xMin_allow_ind = self.xMinMax_allow_ind_ATTACK_LEFT
+                if self.mode == Mode.NORMAL_LEFT:
+                    xMin_allow_ind = self.xMinMax_allow_ind_NORMAL_LEFT
+                if not ind in xMin_allow_ind:
                     xMin += 1
                 elif ind == 0:
                     peaks = board[self.peaks_sl]
                     left_end_Y = peaks[0]
                     right_min_Y = min(peaks[1:])
                     if right_min_Y - left_end_Y < 4:
-                        xMax += 1 
+                        xMin += 1
+
             for x in range(xMin, xMax):
                 # get board data, as if dropdown block
                 dropdown_board, dy= self.getDropDownBoard(board, Shape, direction, x)
@@ -235,32 +278,6 @@ class Block_Controller(object):
             board[self.board_width * self.board_height + _x] = self.board_height - _y
         return board
     
-    def decideMode(self, board):
-        mode = Mode.DEFENCE
-        width = self.board_width
-        height = self.board_height
-
-        if not self.peaks_initialized:
-            board[self.peaks_sl] = \
-                self.get_peaks(board[self.board_sl], height, width)
-            board[self.holes_sl] = \
-                self.get_holes(board[self.board_sl], board[self.peaks_sl])
-            board[self.wells_sl] = \
-                self.get_wells(width, board[self.peaks_sl])
-            self.peaks_initialized = True
-
-        maxY = max(board[self.peaks_sl])
-        n_holes = sum(board[self.holes_sl])
-        wells = board[self.wells_sl]
-        wells_sorted = sorted(wells)
-        second_well = wells_sorted[-2]
-        if second_well < 5 and maxY < 13 and n_holes < 4:
-            if wells[0] > 3 and wells[0] > wells[-1]:
-                mode = Mode.NORMAL_LEFT
-            else:
-                mode = Mode.NORMAL_RIGHT
-        return mode
-
     def calcEvaluationValue(self, board):
         # calc Evaluation Value
         width = self.board_width
@@ -289,7 +306,7 @@ class Block_Controller(object):
 
         eval_list = [nPeaks, nHoles, total_col_with_hole, total_dy, x_transitions, y_transitions, total_none_cols, maxWell, fullLines]
         score = sum([x * y for (x,y) in zip(self.ind, eval_list)])
-
+        
         if fullLines == 4:
             score += 10000
 
