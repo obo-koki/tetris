@@ -6,8 +6,8 @@ import os
 from copy import copy
 
 class Mode(Enum):
-    NORMAL = 1
-    ATTACK = 2
+    NORMAL_RIGHT = 1
+    NORMAL_LEFT = 2
     DEFENCE = 3
     
 class Block_Controller(object):
@@ -88,6 +88,7 @@ class Block_Controller(object):
             (1,1,),
             (1,1,)
         )
+        self.xMax_allow_ind = set([0]) # (shape -1) * 4 + range
 
     # GetNextMove is main function.
     def GetNextMove(self, nextMove, GameStatus):
@@ -113,7 +114,6 @@ class Block_Controller(object):
         # Decide mode
         self.mode = self.decideMode(self.board_backboard)
 
-        
         strategy_candidate = [] # [evalvalue, strategy, board]
 
         #Search current shape
@@ -145,13 +145,30 @@ class Block_Controller(object):
         for direction in DirectionRange:
             # search with x range
             xMin, xMax = shape_xmin_max[direction]
-            if self.mode == Mode.NORMAL and Shape == 2:
-                xMax -= 1
+            ind = (Shape - 1) * 4 + direction
+            if self.mode == Mode.NORMAL_RIGHT:
+                if not ind in self.xMax_allow_ind:
+                    xMax -= 1
+                elif ind == 0:
+                    peaks = board[self.peaks_sl]
+                    right_end_Y = peaks[-1]
+                    left_min_Y = min(peaks[:-1])
+                    if left_min_Y - right_end_Y < 4:
+                        xMax -= 1
+            elif self.mode == Mode.NORMAL_LEFT:
+                if not ind in self.xMax_allow_ind:
+                    xMin += 1
+                elif ind == 0:
+                    peaks = board[self.peaks_sl]
+                    left_end_Y = peaks[0]
+                    right_min_Y = min(peaks[1:])
+                    if right_min_Y - left_end_Y < 4:
+                        xMax += 1 
             for x in range(xMin, xMax):
                 # get board data, as if dropdown block
                 dropdown_board, dy= self.getDropDownBoard(board, Shape, direction, x)
                 # evaluate board
-                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board, Shape, self.mode)
+                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board)
                 # make strategy
                 if hold:
                     strategy = (direction, x, 1, 1, 'y')
@@ -234,24 +251,22 @@ class Block_Controller(object):
 
         maxY = max(board[self.peaks_sl])
         n_holes = sum(board[self.holes_sl])
-        wells_sorted = sorted(board[self.wells_sl])
+        wells = board[self.wells_sl]
+        wells_sorted = sorted(wells)
         second_well = wells_sorted[-2]
         if second_well < 5 and maxY < 13 and n_holes < 4:
-            mode = Mode.NORMAL
-        #if second_well < 5 and maxY < 12 and n_holes < 4:
-            #mode = Mode.ATTACK
+            if wells[0] > 3 and wells[0] > wells[-1]:
+                mode = Mode.NORMAL_LEFT
+            else:
+                mode = Mode.NORMAL_RIGHT
         return mode
 
-    def calcEvaluationValue(self, board, ShapeListClass, mode = Mode.ATTACK):
+    def calcEvaluationValue(self, board):
         # calc Evaluation Value
-
         width = self.board_width
         height = self.board_height
-        #before remove full lines
-        maxY_right = board[self.peaks_sl][-1]
-        maxY = max(board[self.peaks_sl])
 
-        #after remove full lines
+        maxY = max(board[self.peaks_sl])
         board[self.board_sl], fullLines = self.removeFullLines(board[self.board_sl], height, width, maxY)
         peaks_tmp = [peak - fullLines for peak in board[self.peaks_sl]]
         board[self.peaks_sl] = self.get_peaks_from_before(board[self.board_sl], height, width, peaks_tmp)
@@ -267,7 +282,6 @@ class Block_Controller(object):
         maxWell = max(board[self.wells_sl])
         total_col_with_hole = self.get_total_cols_with_hole(width, board[self.holes_sl])
         total_none_cols = self.get_total_none_cols(width, board[self.peaks_sl])
-        #dy_right = peaks[-2] - peaks[-1]
 
         #20220810-2
         if fullLines < 3:
@@ -276,9 +290,6 @@ class Block_Controller(object):
         eval_list = [nPeaks, nHoles, total_col_with_hole, total_dy, x_transitions, y_transitions, total_none_cols, maxWell, fullLines]
         score = sum([x * y for (x,y) in zip(self.ind, eval_list)])
 
-        if mode == Mode.NORMAL and fullLines < 3:
-            score -= 1000 * maxY_right
-        
         if fullLines == 4:
             score += 10000
 

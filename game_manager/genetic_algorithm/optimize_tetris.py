@@ -63,10 +63,10 @@ def eval_ind(individual):
     make_ind_csv(individual)
     execute_tetris_game(gen)
     result = get_result()
-    execute_tetris_game(NGEN-gen)
+    execute_tetris_game(1000000-gen)
     result += get_result()
     GAME_CNT += 1
-    print("GAME_CNT: ",GAME_CNT)
+    #print("GAME_CNT: ",GAME_CNT)
     return result,
 
 if __name__ == '__main__':
