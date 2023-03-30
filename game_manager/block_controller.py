@@ -18,8 +18,10 @@ class Block_Controller(object):
 
     def __init__(self):
         #init param
-        self.ind = self.getIndividual(csv_file = 
-            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual.csv")
+        self.ind_normal = self.getIndividual(csv_file = 
+            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual_normal.csv")
+        self.ind = self.ind_defence = self.getIndividual(csv_file = 
+            os.path.dirname(os.path.abspath(__file__)) + "/genetic_algorithm/individual_defence.csv")
         self.board_width = 10
         self.board_height = 22
         self.ShapeNone_index = 0
@@ -35,7 +37,7 @@ class Block_Controller(object):
 
         #beam search param
         self.beam_width = 80
-        self.estimate_num = 3
+        self.estimate_num = 4
 
         #for hold function
         self.hold = False
@@ -91,15 +93,23 @@ class Block_Controller(object):
             (1,1,),
             (1,1,)
         )
+        self.shape_height_abs = (
+            (0,),
+            (4,1,),
+            (3,2,3,2,),
+            (3,2,3,2,),
+            (3,2,3,2,),
+            (2,),
+            (2,3,),
+            (2,3,)
+        )
         self.xMinMax_allow_ind_ATTACK_RIGHT = set([0]) # (shape -1) * 4 + range
         self.xMinMax_allow_ind_ATTACK_LEFT = set([0]) # (shape -1) * 4 + range
-        self.xMinMax_allow_ind_NORMAL_RIGHT = set([0, 4, 10]) # (shape -1) * 4 + range
-        self.xMinMax_allow_ind_NORMAL_LEFT = set([0, 6, 8]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_NORMAL_RIGHT = set([0, 4, 10, 12]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_NORMAL_LEFT = set([0, 6, 8, 14]) # (shape -1) * 4 + range
 
     # GetNextMove is main function.
     def GetNextMove(self, nextMove, GameStatus):
-        #start = time()
-
         ## Get data from GameStatus
         # current shape info
         CurrentShapeClass = GameStatus["block_info"]["currentShape"]["class"]
@@ -129,7 +139,6 @@ class Block_Controller(object):
 
         # Decide mode
         self.mode = self.decideMode(self.board_backboard)
-        #print(self.mode)
 
         strategy_candidate = [] # [evalvalue, id, strategy, board]
         heapify(strategy_candidate)
@@ -165,29 +174,29 @@ class Block_Controller(object):
             nextMove["strategy"]["use_hold_function"] = "y"
             self.hold = True
 
-        #print("operate_time:", time() - start)
-
         return nextMove
 
     def decideMode(self, board):
         mode = Mode.DEFENCE
+        self.ind = self.ind_defence
         width = self.board_width
         height = self.board_height
 
         board[self.peaks_sl] = \
             self.get_peaks(board[self.board_sl], height, width)
-        board[self.holes_sl] = \
-            self.get_holes(board[self.board_sl], board[self.peaks_sl])
+        board[self.holes_sl], holes_height = \
+            self.get_holes(board[self.board_sl], width, board[self.peaks_sl])
         board[self.wells_sl] = \
             self.get_wells(width, board[self.peaks_sl])
 
-        maxY = max(board[self.peaks_sl])
-        n_holes = sum(board[self.holes_sl])
+        peaks = board[self.peaks_sl]
+        maxY = max(peaks)
         wells = board[self.wells_sl]
         wells_sorted = sorted(wells)
         second_well = wells_sorted[-2]
-        if second_well < 5 and maxY < 15 and n_holes < 4:
-            if wells[0] > 1 and wells[0] > wells[-1]:
+        if second_well < 5 and maxY < 15 and holes_height < 7:
+            self.ind = self.ind_normal
+            if peaks[0] < peaks[-1]:
                 mode = Mode.ATTACK_LEFT
                 if wells[1] > 2:
                     mode = Mode.NORMAL_LEFT
@@ -195,8 +204,6 @@ class Block_Controller(object):
                 mode = Mode.ATTACK_RIGHT
                 if wells[-2] > 2:
                     mode = Mode.NORMAL_RIGHT
-        #if second_well < 5 and maxY < 12 and n_holes < 4:
-            #mode = Mode.ATTACK
         return mode
 
     def beamSearch(self, board, Shape, DirectionRange, strategy_candidate, 
@@ -237,7 +244,7 @@ class Block_Controller(object):
                 # get board data, as if dropdown block
                 dropdown_board, dy= self.getDropDownBoard(board, Shape, direction, x)
                 # evaluate board
-                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board)
+                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board, Shape, direction)
                 if not pre_EvalValuse == None:
                     EvalValue += pre_EvalValuse
                 # make strategy
@@ -305,28 +312,30 @@ class Block_Controller(object):
         # internal function of dropDown.
         coordArray = self.getShapeCoordArray(Shape, direction, x, dy)
         for _x, _y in coordArray:
-            board[_y*self.board_width + _x] = Shape
+            if not _y < 0:
+                board[_y*self.board_width + _x] = Shape
         coordArray_for_peak = self.getShapeCoordArray_for_peak(Shape, direction, x, dy)
         for _x, _y in coordArray_for_peak:
-            board[self.board_width * self.board_height + _x] = self.board_height - _y
+            if _y < 0:
+                board[self.board_width * self.board_height + _x] = self.board_height
+            else:
+                board[self.board_width * self.board_height + _x] = self.board_height - _y
         return board
     
-    def calcEvaluationValue(self, board):
+    def calcEvaluationValue(self, board, Shape, direction):
         # calc Evaluation Value
-
         width = self.board_width
         height = self.board_height
-        #before remove full lines
-        #peaks_before = self.get_peaks(board, height, width)
-        #maxY_right = board[self.peaks_sl][-1]
-        maxY = max(board[self.peaks_sl])
 
-        #after remove full lines
-        board[self.board_sl], fullLines = self.removeFullLines(board[self.board_sl], height, width, maxY)
+        maxPeak = max(board[self.peaks_sl])
+        minPeak = min(board[self.peaks_sl])
+        shape_height = self.shape_height_abs[Shape][direction]
+
+        board[self.board_sl], fullLines = self.removeFullLines(
+            board[self.board_sl], height, width, maxPeak, minPeak, shape_height)
         peaks_tmp = [peak - fullLines for peak in board[self.peaks_sl]]
-        #peaks = self.get_peaks(board, height, width, maxY)
         board[self.peaks_sl] = self.get_peaks_from_before(board[self.board_sl], height, width, peaks_tmp)
-        board[self.holes_sl] = self.get_holes(board[self.board_sl], board[self.peaks_sl])
+        board[self.holes_sl], _ = self.get_holes(board[self.board_sl], width, board[self.peaks_sl])
         board[self.wells_sl] = self.get_wells(width, board[self.peaks_sl])
 
         nPeaks = sum(board[self.peaks_sl])
@@ -338,9 +347,7 @@ class Block_Controller(object):
         maxWell = max(board[self.wells_sl])
         total_col_with_hole = self.get_total_cols_with_hole(width, board[self.holes_sl])
         total_none_cols = self.get_total_none_cols(width, board[self.peaks_sl])
-        #dy_right = peaks[-2] - peaks[-1]
 
-        #20220810-2
         if fullLines < 3:
             fullLines = 0
 
@@ -352,17 +359,27 @@ class Block_Controller(object):
 
         return score, board
     
-    def removeFullLines(self, board, height, width, maxY):
+    def removeFullLines(self, board, height, width, maxPeak, minPeak, shape_height):
         newBoard = [0] * width * height
+        count_height = minPeak - shape_height
         newY = height - 1
+        if count_height > 0:
+            sl = slice((height-count_height)*width,height*width)
+            newBoard[sl] = board[sl]
+            newY -= count_height
+        else:
+            count_height = 0
         fullLines = 0
-        for y in range(height - 1, height - maxY -1, -1):
+        for y in range(height - count_height - 1, height - minPeak -1 , -1):
             blockCount = sum([1 if board[y*width + x] > 0 else 0 for x in range(width)])
             if blockCount == width:
                 fullLines += 1
             else:
                 newBoard[newY * width : (newY + 1) * width] = board[y * width : (y + 1) * width]
                 newY -= 1
+        if maxPeak - minPeak > 0:
+            newBoard[(newY - (maxPeak - minPeak)+1)*width : (newY+1) * width] = \
+                board[(height-maxPeak)*width : (height-minPeak) * width]
         return newBoard, fullLines
     
     def get_peaks(self, board, height, width):
@@ -384,38 +401,44 @@ class Block_Controller(object):
                     break
         return peaks
 
-    def get_holes(self, board, peaks):
-        holes= []
-        for x in range(self.board_width):
+    def get_holes(self, board, width, peaks):
+        holes= [0] * width
+        holes_max = 0
+        for x in range(width):
             start_y = peaks[x] - 1
             if start_y <= 0:
-                holes.append(0)
+                pass
             else:
+                hole_flag = False
                 hole = 0
                 for y in range(start_y, 0, -1):
                     if board[(self.board_height - y) * self.board_width + x] == 0:
+                        if not hole_flag:
+                            if y > holes_max:
+                                holes_max = y
+                                hole_flag = True
                         hole += 1
-                holes.append(hole)
-        return holes
+                holes[x] = hole
+        return holes, holes_max
 
     def get_wells(self, width, peaks):
-        wells = []
+        wells = [0] * width
         for x in range(width):
             if x == 0:
                 well = peaks[1] - peaks[0]
                 well = well if well > 0 else 0
-                wells.append(well)
+                wells[x] = well
             elif x == len(peaks) - 1:
                 well = peaks[-2] - peaks[-1]
                 well = well if well > 0 else 0
-                wells.append(well)
+                wells[x] = well
             else:
                 w1 = peaks[x - 1] - peaks[x]
                 w2 = peaks[x + 1] - peaks[x]
                 w1 = w1 if w1 > 0 else 0
                 w2 = w2 if w2 > 0 else 0
                 well = w1 if w1 >= w2 else w2
-                wells.append(well)
+                wells[x] = well
         return wells
     
     def get_x_transitions(self, board, maxY):
