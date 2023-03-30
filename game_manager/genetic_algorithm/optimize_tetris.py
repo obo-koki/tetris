@@ -178,9 +178,9 @@ if __name__ == '__main__':
     best_value = best_ind.fitness.values
 
     #Search best individual from all generations
-    for ind in hof:
-        if ind.fitness.values > best_value:
-            best_ind = ind
+    #for ind in hof:
+        #if ind.fitness.values > best_value:
+            #best_ind = ind
     print("The best individual is %s and then, the fitness value is %s" % (best_ind, best_ind.fitness.values))
 
     #Get time string
