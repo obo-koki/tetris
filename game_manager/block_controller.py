@@ -128,12 +128,9 @@ class Block_Controller(object):
         if not self.board_initialized:
             self.board_backboard[self.board_sl] = GameStatus["field_info"]["backboard"]
             self.board_initialized = True
-            #print("board_initialized")
 
         # Decide mode
         self.mode = self.decideMode(self.board_backboard)
-        #print("mode:",self.mode)
-        #print("ind",self.ind)
 
         strategy_candidate = [] # [evalvalue, strategy, board]
 
@@ -291,10 +288,14 @@ class Block_Controller(object):
         # internal function of dropDown.
         coordArray = self.getShapeCoordArray(Shape, direction, x, dy)
         for _x, _y in coordArray:
-            board[_y*self.board_width + _x] = Shape
+            if not _y < 0:
+                board[_y*self.board_width + _x] = Shape
         coordArray_for_peak = self.getShapeCoordArray_for_peak(Shape, direction, x, dy)
         for _x, _y in coordArray_for_peak:
-            board[self.board_width * self.board_height + _x] = self.board_height - _y
+            if _y < 0:
+                board[self.board_width * self.board_height + _x] = self.board_height
+            else:
+                board[self.board_width * self.board_height + _x] = self.board_height - _y
         return board
     
     def calcEvaluationValue(self, board, Shape, direction):
@@ -302,15 +303,12 @@ class Block_Controller(object):
         width = self.board_width
         height = self.board_height
 
-        #print("remove_full before")
-        #self.show_board(board[self.board_sl])
         maxPeak = max(board[self.peaks_sl])
         minPeak = min(board[self.peaks_sl])
         shape_height = self.shape_height_abs[Shape][direction]
+
         board[self.board_sl], fullLines = self.removeFullLines(
             board[self.board_sl], height, width, maxPeak, minPeak, shape_height)
-        #print("remove_full after")
-        #self.show_board(board[self.board_sl])
         peaks_tmp = [peak - fullLines for peak in board[self.peaks_sl]]
         board[self.peaks_sl] = self.get_peaks_from_before(board[self.board_sl], height, width, peaks_tmp)
         board[self.holes_sl] = self.get_holes(board[self.board_sl], width, board[self.peaks_sl])
@@ -339,26 +337,25 @@ class Block_Controller(object):
     
     def removeFullLines(self, board, height, width, maxPeak, minPeak, shape_height):
         newBoard = [0] * width * height
-        #count_height = minPeak - shape_height
+        count_height = minPeak - shape_height
         newY = height - 1
-        #if count_height > 0:
-            #sl = slice((height-count_height)*width,height*width)
-            #newBoard[sl] = board[sl]
-            #newY -= count_height
+        if count_height > 0:
+            sl = slice((height-count_height)*width,height*width)
+            newBoard[sl] = board[sl]
+            newY -= count_height
+        else:
+            count_height = 0
         fullLines = 0
-        #for y in range(height - count_height - 1, height - maxPeak -1 , -1):
-            #if y > height - 1:
-                #break
-        for y in range(height - 1, height - maxPeak - 1, -1):
+        for y in range(height - count_height - 1, height - minPeak -1 , -1):
             blockCount = sum([1 if board[y*width + x] > 0 else 0 for x in range(width)])
             if blockCount == width:
                 fullLines += 1
             else:
                 newBoard[newY * width : (newY + 1) * width] = board[y * width : (y + 1) * width]
                 newY -= 1
-        #if maxPeak - minPeak > 0:
-            #newBoard[(newY - (maxPeak - minPeak)+1)*width : (newY+1) * width] = \
-                #board[(height-maxPeak)*width : (height-minPeak) * width]
+        if maxPeak - minPeak > 0:
+            newBoard[(newY - (maxPeak - minPeak)+1)*width : (newY+1) * width] = \
+                board[(height-maxPeak)*width : (height-minPeak) * width]
         return newBoard, fullLines
     
     def get_peaks(self, board, height, width):
