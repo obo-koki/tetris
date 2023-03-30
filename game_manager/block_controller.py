@@ -92,10 +92,20 @@ class Block_Controller(object):
             (1,1,),
             (1,1,)
         )
+        self.shape_height_abs = (
+            (0,),
+            (4,1,),
+            (3,2,3,2,),
+            (3,2,3,2,),
+            (3,2,3,2,),
+            (2,),
+            (2,3,),
+            (2,3,)
+        )
         self.xMinMax_allow_ind_ATTACK_RIGHT = set([0]) # (shape -1) * 4 + range
         self.xMinMax_allow_ind_ATTACK_LEFT = set([0]) # (shape -1) * 4 + range
-        self.xMinMax_allow_ind_NORMAL_RIGHT = set([0, 4, 10]) # (shape -1) * 4 + range
-        self.xMinMax_allow_ind_NORMAL_LEFT = set([0, 6, 8]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_NORMAL_RIGHT = set([0, 4, 10, 12]) # (shape -1) * 4 + range
+        self.xMinMax_allow_ind_NORMAL_LEFT = set([0, 6, 8, 14]) # (shape -1) * 4 + range
 
     # GetNextMove is main function.
     def GetNextMove(self, nextMove, GameStatus):
@@ -122,6 +132,8 @@ class Block_Controller(object):
 
         # Decide mode
         self.mode = self.decideMode(self.board_backboard)
+        #print("mode:",self.mode)
+        #print("ind",self.ind)
 
         strategy_candidate = [] # [evalvalue, strategy, board]
 
@@ -159,7 +171,7 @@ class Block_Controller(object):
             board[self.peaks_sl] = \
                 self.get_peaks(board[self.board_sl], height, width)
             board[self.holes_sl] = \
-                self.get_holes(board[self.board_sl], board[self.peaks_sl])
+                self.get_holes(board[self.board_sl], width, board[self.peaks_sl])
             board[self.wells_sl] = \
                 self.get_wells(width, board[self.peaks_sl])
             self.peaks_initialized = True
@@ -218,7 +230,7 @@ class Block_Controller(object):
                 # get board data, as if dropdown block
                 dropdown_board, dy= self.getDropDownBoard(board, Shape, direction, x)
                 # evaluate board
-                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board)
+                EvalValue, dropdown_board = self.calcEvaluationValue(dropdown_board, Shape, direction)
                 # make strategy
                 if hold:
                     strategy = (direction, x, 1, 1, 'y')
@@ -285,16 +297,23 @@ class Block_Controller(object):
             board[self.board_width * self.board_height + _x] = self.board_height - _y
         return board
     
-    def calcEvaluationValue(self, board):
+    def calcEvaluationValue(self, board, Shape, direction):
         # calc Evaluation Value
         width = self.board_width
         height = self.board_height
 
-        maxY = max(board[self.peaks_sl])
-        board[self.board_sl], fullLines = self.removeFullLines(board[self.board_sl], height, width, maxY)
+        #print("remove_full before")
+        #self.show_board(board[self.board_sl])
+        maxPeak = max(board[self.peaks_sl])
+        minPeak = min(board[self.peaks_sl])
+        shape_height = self.shape_height_abs[Shape][direction]
+        board[self.board_sl], fullLines = self.removeFullLines(
+            board[self.board_sl], height, width, maxPeak, minPeak, shape_height)
+        #print("remove_full after")
+        #self.show_board(board[self.board_sl])
         peaks_tmp = [peak - fullLines for peak in board[self.peaks_sl]]
         board[self.peaks_sl] = self.get_peaks_from_before(board[self.board_sl], height, width, peaks_tmp)
-        board[self.holes_sl] = self.get_holes(board[self.board_sl], board[self.peaks_sl])
+        board[self.holes_sl] = self.get_holes(board[self.board_sl], width, board[self.peaks_sl])
         board[self.wells_sl] = self.get_wells(width, board[self.peaks_sl])
 
         nPeaks = sum(board[self.peaks_sl])
@@ -307,7 +326,6 @@ class Block_Controller(object):
         total_col_with_hole = self.get_total_cols_with_hole(width, board[self.holes_sl])
         total_none_cols = self.get_total_none_cols(width, board[self.peaks_sl])
 
-        #20220810-2
         if fullLines < 3:
             fullLines = 0
 
@@ -319,17 +337,28 @@ class Block_Controller(object):
 
         return score, board
     
-    def removeFullLines(self, board, height, width, maxY):
+    def removeFullLines(self, board, height, width, maxPeak, minPeak, shape_height):
         newBoard = [0] * width * height
+        #count_height = minPeak - shape_height
         newY = height - 1
+        #if count_height > 0:
+            #sl = slice((height-count_height)*width,height*width)
+            #newBoard[sl] = board[sl]
+            #newY -= count_height
         fullLines = 0
-        for y in range(height - 1, height - maxY -1, -1):
+        #for y in range(height - count_height - 1, height - maxPeak -1 , -1):
+            #if y > height - 1:
+                #break
+        for y in range(height - 1, height - maxPeak - 1, -1):
             blockCount = sum([1 if board[y*width + x] > 0 else 0 for x in range(width)])
             if blockCount == width:
                 fullLines += 1
             else:
                 newBoard[newY * width : (newY + 1) * width] = board[y * width : (y + 1) * width]
                 newY -= 1
+        #if maxPeak - minPeak > 0:
+            #newBoard[(newY - (maxPeak - minPeak)+1)*width : (newY+1) * width] = \
+                #board[(height-maxPeak)*width : (height-minPeak) * width]
         return newBoard, fullLines
     
     def get_peaks(self, board, height, width):
@@ -351,38 +380,38 @@ class Block_Controller(object):
                     break
         return peaks
 
-    def get_holes(self, board, peaks):
-        holes= []
-        for x in range(self.board_width):
+    def get_holes(self, board, width, peaks):
+        holes= [0] * width
+        for x in range(width):
             start_y = peaks[x] - 1
             if start_y <= 0:
-                holes.append(0)
+                pass
             else:
                 hole = 0
                 for y in range(start_y, 0, -1):
                     if board[(self.board_height - y) * self.board_width + x] == 0:
                         hole += 1
-                holes.append(hole)
+                holes[x] = hole
         return holes
 
     def get_wells(self, width, peaks):
-        wells = []
+        wells = [0] * width
         for x in range(width):
             if x == 0:
                 well = peaks[1] - peaks[0]
                 well = well if well > 0 else 0
-                wells.append(well)
+                wells[x] = well
             elif x == len(peaks) - 1:
                 well = peaks[-2] - peaks[-1]
                 well = well if well > 0 else 0
-                wells.append(well)
+                wells[x] = well
             else:
                 w1 = peaks[x - 1] - peaks[x]
                 w2 = peaks[x + 1] - peaks[x]
                 w1 = w1 if w1 > 0 else 0
                 w2 = w2 if w2 > 0 else 0
                 well = w1 if w1 >= w2 else w2
-                wells.append(well)
+                wells[x] = well
         return wells
     
     def get_x_transitions(self, board, maxY):
