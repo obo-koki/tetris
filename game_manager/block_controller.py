@@ -36,7 +36,7 @@ class Block_Controller(object):
         self.wells_sl = slice(self.board_width * (self.board_height + 2), self.board_width * (self.board_height + 3))
 
         #beam search param
-        self.beam_width = 60
+        self.beam_width = 80
         self.estimate_num = 3
 
         #for hold function
